@@ -1,37 +1,27 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, getDay, isToday, isPast, isSameDay } from "date-fns";
+import {
+  format, startOfMonth, endOfMonth, eachDayOfInterval,
+  getDay, isToday, isPast, isSameDay, startOfWeek, endOfWeek, addWeeks, subWeeks,
+} from "date-fns";
 import { es } from "date-fns/locale";
 import { StatusCode, ALL_STATUSES, STATUS_LABELS, STATUS_BADGE_COLORS, STATUS_COLORS } from "@/lib/constants";
-import StatusBadge from "./StatusBadge";
 
-interface Person {
-  id: string;
-  name: string;
-  type: string;
-}
-
+interface Person { id: string; name: string; type: string }
 interface Schedule {
-  id: string;
-  personId: string;
-  date: string;
-  status: StatusCode;
+  id: string; personId: string; date: string; status: StatusCode;
   person: { id: string; name: string; type: string };
 }
+interface Props { currentPerson: Person | null; maxSeats: number }
 
-interface MonthCalendarProps {
-  currentPerson: Person | null;
-  maxSeats: number;
-}
-
-export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendarProps) {
+export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
-  const [modalLoading, setModalLoading] = useState(false);
-  const [modalError, setModalError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [weekView, setWeekView] = useState(false);
 
   const year = currentDate.getFullYear();
@@ -40,239 +30,212 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
   const fetchSchedules = useCallback(async () => {
     setLoading(true);
     const res = await fetch(`/api/schedules?year=${year}&month=${month}`);
-    const data = await res.json();
-    setSchedules(Array.isArray(data) ? data : []);
+    setSchedules(await res.json().then(d => Array.isArray(d) ? d : []));
     setLoading(false);
   }, [year, month]);
 
-  useEffect(() => {
-    fetchSchedules();
-  }, [fetchSchedules]);
+  useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
 
-  const days = eachDayOfInterval({
-    start: startOfMonth(currentDate),
-    end: endOfMonth(currentDate),
-  });
+  const days = eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
+  const firstDow = (getDay(startOfMonth(currentDate)) + 6) % 7;
 
-  const firstDayOfWeek = (getDay(startOfMonth(currentDate)) + 6) % 7;
-
-  function getSchedulesForDay(date: Date) {
-    const dateStr = format(date, "yyyy-MM-dd");
-    return schedules.filter((s) => s.date.startsWith(dateStr));
-  }
-
-  function getMyStatusForDay(date: Date): StatusCode | null {
+  const getDaySchedules = (d: Date) => schedules.filter(s => s.date.startsWith(format(d, "yyyy-MM-dd")));
+  const getMyStatus = (d: Date): StatusCode | null => {
     if (!currentPerson) return null;
-    const dateStr = format(date, "yyyy-MM-dd");
-    const s = schedules.find((sc) => sc.personId === currentPerson.id && sc.date.startsWith(dateStr));
-    return s?.status || null;
-  }
-
-  function getOfficeCount(date: Date): number {
-    return getSchedulesForDay(date).filter((s) => s.status === "Of").length;
-  }
-
-  function canEdit(date: Date): boolean {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return !isPast(date) || isSameDay(date, today);
-  }
+    return getDaySchedules(d).find(s => s.personId === currentPerson.id)?.status ?? null;
+  };
+  const canEdit = (d: Date) => {
+    const t = new Date(); t.setHours(0, 0, 0, 0);
+    return !isPast(d) || isSameDay(d, new Date());
+  };
 
   async function saveStatus(date: Date, status: StatusCode | null) {
     if (!currentPerson) return;
-    setModalLoading(true);
-    setModalError(null);
-
+    setSaving(true); setSaveError(null);
     try {
-      let res: Response;
-      if (status === null) {
-        res = await fetch(
-          `/api/schedules?personId=${currentPerson.id}&date=${format(date, "yyyy-MM-dd")}`,
-          { method: "DELETE" }
-        );
-      } else {
-        res = await fetch("/api/schedules", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            personId: currentPerson.id,
-            date: format(date, "yyyy-MM-dd"),
-            status,
-          }),
-        });
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Error al guardar" }));
-        setModalError(err.error || "Error al guardar");
-        return;
-      }
-
+      const dateStr = format(date, "yyyy-MM-dd");
+      const res = status === null
+        ? await fetch(`/api/schedules?personId=${currentPerson.id}&date=${dateStr}`, { method: "DELETE" })
+        : await fetch("/api/schedules", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ personId: currentPerson.id, date: dateStr, status }),
+          });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); setSaveError(e.error || "Error al guardar"); return; }
       await fetchSchedules();
       setSelectedDay(null);
-    } catch {
-      setModalError("Error de conexión");
-    } finally {
-      setModalLoading(false);
-    }
+    } catch { setSaveError("Error de conexión"); }
+    finally { setSaving(false); }
   }
 
-  const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+  // Today stats
+  const todaySchedules = getDaySchedules(new Date());
+  const todayOf = todaySchedules.filter(s => s.status === "Of").length;
+  const todayFree = maxSeats - todayOf;
+  const inCurrentMonth = new Date().getMonth() + 1 === month && new Date().getFullYear() === year;
 
-  function getWeeks() {
-    const weeks: Date[][] = [];
-    let week: Date[] = [];
-    const allDays = [...Array(firstDayOfWeek).fill(null), ...days];
-    allDays.forEach((day, i) => {
-      if (i % 7 === 0 && week.length) { weeks.push(week); week = []; }
-      week.push(day);
-    });
-    if (week.length) weeks.push(week);
-    return weeks;
-  }
+  // Build weeks
+  const padded = [...Array(firstDow).fill(null), ...days];
+  const weeks: (Date | null)[][] = [];
+  for (let i = 0; i < padded.length; i += 7) weeks.push(padded.slice(i, i + 7) as (Date | null)[]);
 
-  // Today's availability banner
-  const today = new Date();
-  const todaySchedules = getSchedulesForDay(today);
-  const todayOffice = todaySchedules.filter((s) => s.status === "Of").length;
-  const todayFree = maxSeats - todayOffice;
-  const isCurrentMonth = today.getMonth() + 1 === month && today.getFullYear() === year;
+  // Week view
+  const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
+  const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
+
+  const DOW = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sá", "Do"];
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Today's availability banner */}
-      {isCurrentMonth && !loading && (
-        <div className={`rounded-xl p-4 flex items-center justify-between ${
-          todayFree <= 0 ? "bg-red-50 border border-red-200" :
-          todayFree <= maxSeats * 0.1 ? "bg-orange-50 border border-orange-200" :
-          "bg-green-50 border border-green-200"
+    <div className="flex flex-col gap-3">
+
+      {/* Today banner */}
+      {inCurrentMonth && !loading && (
+        <div className={`rounded-2xl p-4 flex items-center justify-between border ${
+          todayFree <= 0 ? "bg-red-50 border-red-200" :
+          todayFree <= 3 ? "bg-amber-50 border-amber-200" :
+          "bg-emerald-50 border-emerald-200"
         }`}>
           <div>
-            <p className={`text-xs font-semibold uppercase tracking-wide ${
-              todayFree <= 0 ? "text-red-500" : todayFree <= maxSeats * 0.1 ? "text-orange-500" : "text-green-600"
-            }`}>Hoy — {format(today, "EEEE d", { locale: es })}</p>
-            <p className={`text-2xl font-bold mt-0.5 ${
-              todayFree <= 0 ? "text-red-700" : todayFree <= maxSeats * 0.1 ? "text-orange-700" : "text-green-700"
-            }`}>
-              {todayFree <= 0 ? "Sin puestos" : `${todayFree} puestos libres`}
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-widest mb-0.5">
+              Hoy · {format(new Date(), "EEEE d", { locale: es })}
             </p>
-            <p className={`text-xs mt-0.5 ${
-              todayFree <= 0 ? "text-red-500" : "text-gray-500"
-            }`}>{todayOffice} de {maxSeats} ocupados</p>
+            <p className={`text-3xl font-black ${todayFree <= 0 ? "text-red-600" : todayFree <= 3 ? "text-amber-600" : "text-emerald-600"}`}>
+              {todayFree <= 0 ? "Sin puestos" : `${todayFree} libres`}
+            </p>
+            <p className="text-xs text-gray-400 mt-0.5">{todayOf} de {maxSeats} puestos ocupados</p>
           </div>
-          <div className={`w-14 h-14 rounded-full flex items-center justify-center text-2xl font-bold ${
-            todayFree <= 0 ? "bg-red-200 text-red-700" :
-            todayFree <= maxSeats * 0.1 ? "bg-orange-200 text-orange-700" :
-            "bg-green-200 text-green-700"
+          <div className={`w-16 h-16 rounded-2xl flex flex-col items-center justify-center font-black text-2xl shadow-sm ${
+            todayFree <= 0 ? "bg-red-100 text-red-600" :
+            todayFree <= 3 ? "bg-amber-100 text-amber-600" :
+            "bg-emerald-100 text-emerald-600"
           }`}>
             {todayFree <= 0 ? "🚫" : todayFree}
           </div>
         </div>
       )}
 
-      {/* Month navigation */}
-      <div className="flex items-center justify-between bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-        <button
-          onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 text-lg"
-        >‹</button>
-        <div className="flex flex-col items-center">
-          <h2 className="text-lg font-bold text-gray-900 capitalize">
-            {format(currentDate, "MMMM yyyy", { locale: es })}
-          </h2>
-          <button onClick={() => setCurrentDate(new Date())} className="text-xs text-blue-600 hover:underline">
-            Hoy
-          </button>
-        </div>
-        <button
-          onClick={() => setCurrentDate(new Date(year, month, 1))}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-600 text-lg"
-        >›</button>
-      </div>
-
-      {/* View toggle */}
-      <div className="flex gap-2">
-        <button
-          onClick={() => setWeekView(false)}
-          className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${!weekView ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"}`}
-        >Mes</button>
-        <button
-          onClick={() => setWeekView(true)}
-          className={`flex-1 py-1.5 rounded-lg text-sm font-medium transition-colors ${weekView ? "bg-blue-600 text-white" : "bg-gray-100 text-gray-600"}`}
-        >Semana</button>
-      </div>
-
-      {/* Calendar grid */}
-      {loading ? (
-        <div className="flex items-center justify-center h-48 text-gray-400">Cargando...</div>
-      ) : (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="grid grid-cols-7 border-b border-gray-100">
-            {weekDays.map((d) => (
-              <div key={d} className="py-2 text-center text-xs font-semibold text-gray-500">{d}</div>
-            ))}
+      {/* Nav + view toggle */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-50">
+          <button onClick={() => setCurrentDate(new Date(year, month - 2, 1))} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-500 text-lg transition-colors">‹</button>
+          <div className="text-center">
+            <p className="font-bold text-gray-900 capitalize">{format(currentDate, "MMMM yyyy", { locale: es })}</p>
+            <button onClick={() => { setCurrentDate(new Date()); }} className="text-xs text-blue-500 hover:underline">hoy</button>
           </div>
+          <button onClick={() => setCurrentDate(new Date(year, month, 1))} className="w-9 h-9 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-500 text-lg transition-colors">›</button>
+        </div>
 
-          {weekView ? (
-            <WeekDetail
-              week={getCurrentWeek(days, firstDayOfWeek)}
-              schedules={schedules}
-              currentPerson={currentPerson}
-              maxSeats={maxSeats}
-              onDayClick={(day) => canEdit(day) && currentPerson && setSelectedDay(day)}
-            />
-          ) : (
+        <div className="flex border-b border-gray-50">
+          {["Mes", "Semana"].map((v, i) => (
+            <button key={v} onClick={() => setWeekView(i === 1)}
+              className={`flex-1 py-2 text-sm font-semibold transition-colors ${weekView === (i === 1) ? "text-blue-600 border-b-2 border-blue-500" : "text-gray-400 hover:text-gray-600"}`}>
+              {v}
+            </button>
+          ))}
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center h-52 text-gray-300">
+            <div className="flex flex-col items-center gap-2">
+              <div className="w-6 h-6 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs">Cargando...</span>
+            </div>
+          </div>
+        ) : weekView ? (
+          /* ── WEEK VIEW ── */
+          <div>
+            <div className="grid grid-cols-7 bg-gray-50/60">
+              {DOW.map(d => <div key={d} className="py-2 text-center text-xs font-bold text-gray-400">{d}</div>)}
+            </div>
+            <div className="divide-y divide-gray-50">
+              {weekDays.map((day, i) => {
+                const ds = getDaySchedules(day);
+                const ofCount = ds.filter(s => s.status === "Of").length;
+                const free = maxSeats - ofCount;
+                const my = getMyStatus(day);
+                const weekend = i >= 5;
+                const past = isPast(day) && !isSameDay(day, new Date());
+                return (
+                  <div key={i} onClick={() => setSelectedDay(day)}
+                    className={`p-3 cursor-pointer transition-colors ${weekend ? "bg-gray-50/50" : "hover:bg-blue-50/40"} ${past ? "opacity-50" : ""} ${isToday(day) ? "border-l-[3px] border-blue-500" : ""}`}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <div className="flex items-center gap-2">
+                        <span className={`w-7 h-7 flex items-center justify-center rounded-full text-sm font-bold ${isToday(day) ? "bg-blue-500 text-white" : "text-gray-700"}`}>
+                          {format(day, "d")}
+                        </span>
+                        <span className="text-xs text-gray-400 font-medium">{DOW[i]}</span>
+                        {my && <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${STATUS_COLORS[my]}`}>{my}</span>}
+                      </div>
+                      {!weekend && (
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${free <= 0 ? "bg-red-100 text-red-600" : free <= 3 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-700"}`}>
+                          {free <= 0 ? "Lleno" : `${free} libres`}
+                        </span>
+                      )}
+                    </div>
+                    {ofCount > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {ds.filter(s => s.status === "Of").slice(0, 6).map(s => (
+                          <span key={s.id} className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                            {s.person.name.split(" ")[0]}
+                          </span>
+                        ))}
+                        {ofCount > 6 && <span className="text-xs text-gray-400">+{ofCount - 6}</span>}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          /* ── MONTH VIEW ── */
+          <>
+            <div className="grid grid-cols-7 bg-gray-50/60">
+              {DOW.map(d => <div key={d} className="py-2 text-center text-xs font-bold text-gray-400">{d}</div>)}
+            </div>
             <div>
-              {getWeeks().map((week, wi) => (
-                <div key={wi} className="grid grid-cols-7 border-b border-gray-50 last:border-0">
+              {weeks.map((week, wi) => (
+                <div key={wi} className="grid grid-cols-7 border-t border-gray-50">
                   {week.map((day, di) => {
-                    if (!day) return <div key={di} className="min-h-[72px] bg-gray-50/50" />;
-                    const daySchedules = getSchedulesForDay(day);
-                    const myStatus = getMyStatusForDay(day);
-                    const officeCount = daySchedules.filter((s) => s.status === "Of").length;
-                    const freeCount = maxSeats - officeCount;
-                    const isWeekend = di >= 5;
+                    if (!day) return <div key={di} className="min-h-[80px] bg-gray-50/30" />;
+                    const ds = getDaySchedules(day);
+                    const ofCount = ds.filter(s => s.status === "Of").length;
+                    const free = maxSeats - ofCount;
+                    const my = getMyStatus(day);
+                    const weekend = di >= 5;
                     const past = isPast(day) && !isSameDay(day, new Date());
-                    const editable = canEdit(day) && !!currentPerson;
-
+                    const today = isToday(day);
                     return (
-                      <div
-                        key={di}
-                        onClick={() => setSelectedDay(day)}
-                        className={`min-h-[72px] p-1.5 border-r border-gray-50 last:border-0 transition-colors relative cursor-pointer
-                          ${isWeekend ? "bg-gray-50" : "bg-white"}
-                          ${past ? "opacity-55" : ""}
-                          ${editable ? "hover:bg-blue-50" : "hover:bg-gray-50"}
-                          ${isToday(day) ? "ring-2 ring-inset ring-blue-400" : ""}
-                        `}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-xs font-semibold ${isToday(day) ? "text-blue-600" : "text-gray-700"}`}>
+                      <div key={di} onClick={() => setSelectedDay(day)}
+                        className={`min-h-[80px] p-1.5 cursor-pointer border-r border-gray-50 last:border-r-0 transition-colors flex flex-col gap-1
+                          ${weekend ? "bg-gray-50/40" : "bg-white hover:bg-blue-50/30"}
+                          ${past ? "opacity-50" : ""}
+                          ${today ? "ring-2 ring-inset ring-blue-400 bg-blue-50/20" : ""}
+                        `}>
+                        {/* Date number */}
+                        <div className="flex items-center justify-between">
+                          <span className={`w-6 h-6 flex items-center justify-center rounded-full text-xs font-bold ${today ? "bg-blue-500 text-white" : "text-gray-600"}`}>
                             {format(day, "d")}
                           </span>
-                          {!isWeekend && (
-                            <span className={`text-[10px] font-medium px-1 rounded ${
-                              freeCount <= 0 ? "bg-red-100 text-red-600" :
-                              freeCount <= maxSeats * 0.1 ? "bg-orange-100 text-orange-600" :
-                              "bg-green-100 text-green-600"
-                            }`}>
-                              {freeCount <= 0 ? "Lleno" : `${freeCount}↑`}
+                          {!weekend && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full leading-none ${free <= 0 ? "bg-red-100 text-red-500" : free <= 3 ? "bg-amber-100 text-amber-600" : "bg-emerald-100 text-emerald-600"}`}>
+                              {free <= 0 ? "0" : free}
                             </span>
                           )}
                         </div>
-
-                        {myStatus && (
-                          <div className={`text-[10px] font-bold px-1 py-0.5 rounded text-center mb-1 ${STATUS_COLORS[myStatus]}`}>
-                            {myStatus}
-                          </div>
+                        {/* My status pill */}
+                        {my && (
+                          <span className={`text-[10px] font-bold px-1 py-0.5 rounded text-center ${STATUS_COLORS[my]}`}>
+                            {my}
+                          </span>
                         )}
-
-                        {!isWeekend && officeCount > 0 && (
-                          <div className="flex flex-wrap gap-0.5">
-                            {daySchedules.filter((s) => s.status === "Of").slice(0, 4).map((s) => (
-                              <div key={s.id} className="w-1.5 h-1.5 rounded-full bg-green-500" title={s.person.name} />
+                        {/* Office people dots */}
+                        {!weekend && ofCount > 0 && (
+                          <div className="flex flex-wrap gap-0.5 mt-auto">
+                            {ds.filter(s => s.status === "Of").slice(0, 5).map(s => (
+                              <div key={s.id} title={s.person.name} className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
                             ))}
-                            {officeCount > 4 && <span className="text-[9px] text-gray-400">+{officeCount - 4}</span>}
+                            {ofCount > 5 && <span className="text-[9px] text-gray-300 leading-none">+{ofCount - 5}</span>}
                           </div>
                         )}
                       </div>
@@ -281,256 +244,156 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
                 </div>
               ))}
             </div>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
 
-      {/* Day detail modal */}
+      {/* Day modal */}
       {selectedDay && (
         <DayModal
           day={selectedDay}
-          schedules={getSchedulesForDay(selectedDay)}
-          myStatus={getMyStatusForDay(selectedDay)}
+          schedules={getDaySchedules(selectedDay)}
+          myStatus={getMyStatus(selectedDay)}
           maxSeats={maxSeats}
-          loading={modalLoading}
-          error={modalError}
+          saving={saving}
+          error={saveError}
           canEdit={canEdit(selectedDay) && !!currentPerson}
           currentPerson={currentPerson}
           onSave={saveStatus}
-          onClose={() => { setSelectedDay(null); setModalError(null); }}
+          onClose={() => { setSelectedDay(null); setSaveError(null); }}
         />
       )}
     </div>
   );
 }
 
-// ─── Week Detail ──────────────────────────────────────────────────────────────
+/* ── Day Modal ────────────────────────────────────────────────────── */
 
-function getCurrentWeek(days: Date[], firstDayOfWeek: number): Date[] {
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - ((today.getDay() + 6) % 7));
-  startOfWeek.setHours(0, 0, 0, 0);
-
-  const result: Date[] = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(startOfWeek);
-    d.setDate(startOfWeek.getDate() + i);
-    result.push(d);
-  }
-  return result;
-}
-
-interface WeekDetailProps {
-  week: Date[];
-  schedules: Schedule[];
+interface ModalProps {
+  day: Date; schedules: Schedule[]; myStatus: StatusCode | null;
+  maxSeats: number; saving: boolean; error: string | null; canEdit: boolean;
   currentPerson: Person | null;
-  maxSeats: number;
-  onDayClick: (day: Date) => void;
-}
-
-function WeekDetail({ week, schedules, currentPerson, maxSeats, onDayClick }: WeekDetailProps) {
-  const weekDays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-
-  return (
-    <div className="divide-y divide-gray-50">
-      {week.map((day, i) => {
-        if (!day) return null;
-        const daySchedules = schedules.filter((s) => s.date.startsWith(format(day, "yyyy-MM-dd")));
-        const officeSchedules = daySchedules.filter((s) => s.status === "Of");
-        const freeCount = maxSeats - officeSchedules.length;
-        const mySchedule = currentPerson ? daySchedules.find((s) => s.personId === currentPerson.id) : null;
-        const isWeekend = i >= 5;
-        const past = isPast(day) && !isSameDay(day, new Date());
-        const editable = (!isPast(day) || isSameDay(day, new Date())) && !!currentPerson;
-
-        return (
-          <div
-            key={i}
-            onClick={() => onDayClick(day)}
-            className={`p-3 cursor-pointer ${isWeekend ? "bg-gray-50" : ""} ${editable ? "hover:bg-blue-50" : "hover:bg-gray-50"} ${past ? "opacity-60" : ""} ${isToday(day) ? "border-l-4 border-blue-400" : ""}`}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <span className={`font-semibold ${isToday(day) ? "text-blue-600" : "text-gray-800"}`}>
-                  {weekDays[i]} {format(day, "d")}
-                </span>
-                {mySchedule && (
-                  <span className={`text-xs font-bold px-2 py-0.5 rounded ${STATUS_COLORS[mySchedule.status as StatusCode]}`}>
-                    {mySchedule.status}
-                  </span>
-                )}
-              </div>
-              {!isWeekend && (
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                    freeCount <= 0 ? "bg-red-100 text-red-600" :
-                    freeCount <= maxSeats * 0.1 ? "bg-orange-100 text-orange-600" :
-                    "bg-green-100 text-green-600"
-                  }`}>
-                    {freeCount <= 0 ? "Lleno" : `${freeCount} libres`}
-                  </span>
-                  <span className="text-xs text-gray-400">{officeSchedules.length}/{maxSeats}</span>
-                </div>
-              )}
-            </div>
-
-            {officeSchedules.length > 0 && (
-              <div className="flex flex-wrap gap-1">
-                {officeSchedules.map((s) => (
-                  <span key={s.id} className="text-xs bg-green-100 text-green-800 px-1.5 py-0.5 rounded-full">
-                    {s.person.name.split(" ")[0]}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ─── Day Modal ────────────────────────────────────────────────────────────────
-
-interface DayModalProps {
-  day: Date;
-  schedules: Schedule[];
-  myStatus: StatusCode | null;
-  maxSeats: number;
-  loading: boolean;
-  error: string | null;
-  canEdit: boolean;
-  currentPerson: Person | null;
-  onSave: (date: Date, status: StatusCode | null) => void;
+  onSave: (d: Date, s: StatusCode | null) => void;
   onClose: () => void;
 }
 
-function DayModal({ day, schedules, myStatus, maxSeats, loading, error, canEdit, currentPerson, onSave, onClose }: DayModalProps) {
-  const officeSchedules = schedules.filter((s) => s.status === "Of");
-  const otherSchedules = schedules.filter((s) => s.status !== "Of");
-  const freeCount = maxSeats - officeSchedules.length;
-  const isFull = freeCount <= 0;
+function DayModal({ day, schedules, myStatus, maxSeats, saving, error, canEdit, currentPerson, onSave, onClose }: ModalProps) {
+  const ofCount = schedules.filter(s => s.status === "Of").length;
+  const free = maxSeats - ofCount;
+  const pct = Math.min(100, (ofCount / maxSeats) * 100);
 
-  // Group by status
-  const byStatus = ALL_STATUSES.reduce((acc, status) => {
-    const list = schedules.filter((s) => s.status === status);
-    if (list.length > 0) acc[status] = list;
+  const byStatus = ALL_STATUSES.reduce((acc, s) => {
+    const list = schedules.filter(x => x.status === s);
+    if (list.length) acc[s] = list;
     return acc;
   }, {} as Record<StatusCode, Schedule[]>);
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-2xl w-full max-w-sm shadow-xl max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-3 bg-black/40 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-3xl w-full max-w-sm shadow-2xl max-h-[92vh] flex flex-col overflow-hidden" onClick={e => e.stopPropagation()}>
+
         {/* Header */}
-        <div className="p-4 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center justify-between">
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-start justify-between">
             <div>
-              <h3 className="font-bold text-gray-900 capitalize">
-                {format(day, "EEEE d 'de' MMMM", { locale: es })}
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">
+                {format(day, "EEEE", { locale: es })}
+              </p>
+              <h3 className="text-xl font-black text-gray-900 capitalize mt-0.5">
+                {format(day, "d 'de' MMMM", { locale: es })}
               </h3>
-              <div className="flex items-center gap-2 mt-1">
-                <span className={`text-sm font-semibold ${
-                  isFull ? "text-red-600" : freeCount <= maxSeats * 0.1 ? "text-orange-600" : "text-green-600"
-                }`}>
-                  {isFull ? "Sin puestos disponibles" : `${freeCount} puestos libres`}
-                </span>
-                <span className="text-xs text-gray-400">({officeSchedules.length}/{maxSeats} ocupados)</span>
-              </div>
             </div>
-            <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg text-gray-500 text-xl ml-2">×</button>
+            <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 text-lg transition-colors">×</button>
           </div>
 
-          {/* Capacity bar */}
-          <div className="mt-2 h-2 bg-gray-100 rounded-full overflow-hidden">
-            <div
-              className={`h-full rounded-full transition-all ${
-                isFull ? "bg-red-500" : freeCount <= maxSeats * 0.1 ? "bg-orange-400" : "bg-green-500"
-              }`}
-              style={{ width: `${Math.min(100, (officeSchedules.length / maxSeats) * 100)}%` }}
-            />
+          {/* Capacity */}
+          <div className="mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-lg font-black ${free <= 0 ? "text-red-500" : free <= 3 ? "text-amber-500" : "text-emerald-600"}`}>
+                {free <= 0 ? "Sin puestos disponibles" : `${free} puestos libres`}
+              </span>
+              <span className="text-xs text-gray-400 font-medium">{ofCount}/{maxSeats}</span>
+            </div>
+            <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-500 ${free <= 0 ? "bg-red-400" : free <= 3 ? "bg-amber-400" : "bg-emerald-400"}`}
+                style={{ width: `${pct}%` }} />
+            </div>
           </div>
         </div>
 
-        {/* Scrollable content */}
-        <div className="overflow-y-auto flex-1">
-          {/* Error / loading */}
-          {error && (
-            <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-          )}
-          {loading && (
-            <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">Guardando...</div>
-          )}
+        {/* Scrollable body */}
+        <div className="overflow-y-auto flex-1 pb-4">
 
-          {/* Status selector — only for future days */}
+          {/* Errors / saving */}
+          {error && <div className="mx-5 mb-3 px-4 py-2.5 bg-red-50 border border-red-200 rounded-xl text-sm text-red-600">{error}</div>}
+          {saving && <div className="mx-5 mb-3 px-4 py-2.5 bg-blue-50 border border-blue-200 rounded-xl text-sm text-blue-600 text-center">Guardando...</div>}
+
+          {/* Status selector */}
           {canEdit && currentPerson && (
-            <div className="p-4 border-b border-gray-100">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Mi estado:</p>
+            <div className="px-5 pb-4 border-b border-gray-100">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Mi estado</p>
               <div className="grid grid-cols-2 gap-2">
-                {ALL_STATUSES.map((status) => {
-                  const disabled = status === "Of" && isFull && myStatus !== "Of";
+                {ALL_STATUSES.map(status => {
+                  const full = status === "Of" && free <= 0 && myStatus !== "Of";
+                  const active = myStatus === status;
                   return (
-                    <button
-                      key={status}
-                      disabled={disabled || loading}
-                      onClick={() => onSave(day, status)}
-                      className={`py-2.5 px-3 rounded-xl text-sm font-medium flex items-center justify-between transition-all
-                        ${myStatus === status
-                          ? STATUS_COLORS[status] + " ring-2 ring-offset-1 ring-blue-400"
-                          : STATUS_BADGE_COLORS[status] + " border"}
-                        ${disabled ? "opacity-40 cursor-not-allowed" : "hover:opacity-90 active:scale-95"}
-                      `}
-                    >
-                      <span className="truncate mr-1">{STATUS_LABELS[status]}</span>
-                      <StatusBadge status={status} />
+                    <button key={status} disabled={full || saving} onClick={() => onSave(day, status)}
+                      className={`py-3 px-3 rounded-2xl text-sm font-semibold flex items-center justify-between transition-all active:scale-95
+                        ${active ? STATUS_COLORS[status] + " shadow-md scale-[1.02]" : STATUS_BADGE_COLORS[status] + " border"}
+                        ${full ? "opacity-30 cursor-not-allowed" : "hover:opacity-90"}
+                      `}>
+                      <span className="truncate mr-1 text-left">{STATUS_LABELS[status]}</span>
+                      <span className="text-xs font-black opacity-70 shrink-0">{status}</span>
                     </button>
                   );
                 })}
               </div>
               {myStatus && (
-                <button
-                  onClick={() => onSave(day, null)}
-                  disabled={loading}
-                  className="w-full mt-3 py-2 text-sm text-red-600 hover:bg-red-50 rounded-xl transition-colors border border-red-200"
-                >
+                <button onClick={() => onSave(day, null)} disabled={saving}
+                  className="w-full mt-2 py-2 text-sm text-red-500 hover:bg-red-50 rounded-xl transition-colors border border-red-100 font-medium">
                   Quitar mi estado
                 </button>
               )}
             </div>
           )}
 
-          {/* All assigned people grouped by status */}
-          {schedules.length > 0 ? (
-            <div className="p-4">
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
-                Asignados este día ({schedules.length}):
-              </p>
-              <div className="flex flex-col gap-3">
-                {ALL_STATUSES.filter((s) => byStatus[s]?.length > 0).map((status) => (
-                  <div key={status}>
-                    <div className="flex items-center gap-2 mb-1.5">
-                      <StatusBadge status={status} />
-                      <span className="text-xs text-gray-500">{STATUS_LABELS[status]} — {byStatus[status].length} persona{byStatus[status].length > 1 ? "s" : ""}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 pl-1">
-                      {byStatus[status].map((s) => (
-                        <span
-                          key={s.id}
-                          className={`text-xs px-2 py-0.5 rounded-full border ${STATUS_BADGE_COLORS[status]}`}
-                        >
-                          {s.person.name}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <div className="p-6 text-center text-gray-400 text-sm">
-              Nadie ha registrado estado para este día
+          {/* Not logged in / not linked */}
+          {!currentPerson && canEdit && (
+            <div className="mx-5 my-3 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-700">
+              Inicia sesión para registrar tu presencia
             </div>
           )}
+
+          {/* People list */}
+          <div className="px-5 pt-4">
+            {schedules.length === 0 ? (
+              <p className="text-center text-gray-300 text-sm py-4">Nadie registrado aún</p>
+            ) : (
+              <>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                  Registrados ({schedules.length})
+                </p>
+                <div className="flex flex-col gap-3">
+                  {ALL_STATUSES.filter(s => byStatus[s]).map(status => (
+                    <div key={status}>
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-black px-2 py-1 rounded-lg border ${STATUS_BADGE_COLORS[status]}`}>{status}</span>
+                        <span className="text-xs text-gray-400">{STATUS_LABELS[status]}</span>
+                        <span className="text-xs text-gray-300 ml-auto">{byStatus[status].length}</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 pl-1">
+                        {byStatus[status].map(s => (
+                          <span key={s.id} className={`text-xs px-2.5 py-1 rounded-full border font-medium ${STATUS_BADGE_COLORS[status]}`}>
+                            {s.person.name}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
     </div>

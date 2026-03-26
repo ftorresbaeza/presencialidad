@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import authConfig from "./auth.config";
 
 async function autoLinkPerson(userId: string, email: string | null, name: string | null) {
-  // 1. Try match by email
+  // 1. Match by email
   if (email) {
     const person = await prisma.person.findFirst({
       where: { email: { equals: email, mode: "insensitive" }, active: true },
@@ -14,8 +14,7 @@ async function autoLinkPerson(userId: string, email: string | null, name: string
       return person;
     }
   }
-
-  // 2. Try match by Google display name
+  // 2. Match by Google display name
   if (name) {
     const person = await prisma.person.findFirst({
       where: { name: { equals: name, mode: "insensitive" }, active: true },
@@ -25,8 +24,7 @@ async function autoLinkPerson(userId: string, email: string | null, name: string
       return person;
     }
   }
-
-  // 3. Auto-create a new Person with Google name
+  // 3. Create new Person
   const displayName = name || email?.split("@")[0] || "Usuario";
   const newPerson = await prisma.person.create({
     data: { name: displayName, email: email || undefined, active: true },
@@ -40,11 +38,12 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
   callbacks: {
     async jwt({ token, user, trigger }) {
-      if (user) {
+      // On sign-in: user object is present
+      if (user?.id) {
         token.id = user.id;
         const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
-        if (dbUser && !dbUser.personId && user.id) {
-          const person = await autoLinkPerson(user.id as string, dbUser.email ?? null, dbUser.name ?? null);
+        if (dbUser && !dbUser.personId) {
+          const person = await autoLinkPerson(user.id, dbUser.email ?? null, dbUser.name ?? null);
           token.personId = person.id;
           token.personName = person.name;
         } else if (dbUser?.personId) {
@@ -53,14 +52,24 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
           token.personName = person?.name;
         }
       }
-      if (trigger === "update" || (!token.personId && token.id)) {
+
+      // On every request: refresh if personId missing in token
+      if (!token.personId && token.id) {
         const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
-        if (dbUser?.personId) {
-          const person = await prisma.person.findUnique({ where: { id: dbUser.personId } });
-          token.personId = dbUser.personId;
-          token.personName = person?.name;
+        if (dbUser) {
+          if (!dbUser.personId) {
+            // Still not linked — run auto-link now
+            const person = await autoLinkPerson(token.id as string, dbUser.email ?? null, dbUser.name ?? null);
+            token.personId = person.id;
+            token.personName = person.name;
+          } else {
+            const person = await prisma.person.findUnique({ where: { id: dbUser.personId } });
+            token.personId = dbUser.personId;
+            token.personName = person?.name;
+          }
         }
       }
+
       return token;
     },
     async session({ session, token }) {
