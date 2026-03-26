@@ -5,9 +5,6 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfM
 import { es } from "date-fns/locale";
 import { STATUS_LABELS, StatusCode, ALL_STATUSES } from "@/lib/constants";
 
-interface Person {
-  id: string; name: string; type: string; email: string | null; active: boolean;
-}
 interface Schedule {
   personId: string; date: string; status: string;
   person: { id: string; name: string; type: string };
@@ -33,34 +30,23 @@ function initials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-type Tab = "people" | "users" | "leaderboard" | "reports" | "config";
+type Tab = "users" | "leaderboard" | "reports" | "config";
 
 export default function AdminClient() {
-  const [people, setPeople] = useState<Person[]>([]);
   const [maxSeats, setMaxSeats] = useState(30);
-  const [loading, setLoading] = useState(true);
-  const [newName, setNewName] = useState("");
-  const [newType, setNewType] = useState("INTERNAL");
-  const [newEmail, setNewEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [seatInput, setSeatInput] = useState("30");
-  const [activeTab, setActiveTab] = useState<Tab>("people");
-  const [showInactive, setShowInactive] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("users");
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [leaderboard, setLeaderboard] = useState<{ topOffice: LeaderEntry[]; topTravel: LeaderEntry[]; topRemote: LeaderEntry[] } | null>(null);
 
-  useEffect(() => { loadData(); }, []);
-
-  async function loadData() {
-    setLoading(true);
-    const [pRes, cRes] = await Promise.all([fetch("/api/people"), fetch("/api/config")]);
-    const pData = await pRes.json();
-    const cData = await cRes.json();
-    setPeople(Array.isArray(pData) ? pData : []);
-    setMaxSeats(cData.maxSeats);
-    setSeatInput(String(cData.maxSeats));
-    setLoading(false);
-  }
+  useEffect(() => {
+    fetch("/api/config").then(r => r.json()).then(d => {
+      setMaxSeats(d.maxSeats);
+      setSeatInput(String(d.maxSeats));
+    });
+    loadUsers();
+  }, []);
 
   async function loadUsers() {
     const res = await fetch("/api/admin/users");
@@ -75,32 +61,8 @@ export default function AdminClient() {
   }
 
   useEffect(() => {
-    if (activeTab === "users") loadUsers();
     if (activeTab === "leaderboard") loadLeaderboard();
   }, [activeTab]);
-
-  async function addPerson(e: React.FormEvent) {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    setSaving(true);
-    await fetch("/api/people", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName.trim(), type: newType, email: newEmail }),
-    });
-    setNewName(""); setNewEmail("");
-    await loadData();
-    setSaving(false);
-  }
-
-  async function toggleActive(p: Person) {
-    await fetch(`/api/people/${p.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: !p.active }),
-    });
-    await loadData();
-  }
 
   async function saveSeats() {
     const n = parseInt(seatInput);
@@ -138,12 +100,7 @@ export default function AdminClient() {
     alert("Notificación enviada a todos los suscriptores");
   }
 
-  const shown = people.filter((p) => showInactive ? true : p.active);
-  const internal = shown.filter((p) => p.type === "INTERNAL");
-  const external = shown.filter((p) => p.type === "EXTERNAL");
-
   const TABS: { id: Tab; label: string }[] = [
-    { id: "people", label: "Personas" },
     { id: "users", label: "Usuarios" },
     { id: "leaderboard", label: "Ranking" },
     { id: "reports", label: "Reportes" },
@@ -178,73 +135,7 @@ export default function AdminClient() {
           ))}
         </div>
 
-        {loading && activeTab === "people" ? (
-          <div className="flex items-center justify-center h-48 text-gray-400">
-            <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : (
-          <>
-            {/* ── PEOPLE TAB ── */}
-            {activeTab === "people" && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h2 className="font-bold text-gray-900 mb-3">Agregar persona</h2>
-                  <form onSubmit={addPerson} className="flex flex-col gap-3">
-                    <input type="text" placeholder="Nombre completo" value={newName} onChange={e => setNewName(e.target.value)} required
-                      className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                    <input type="email" placeholder="Email (opcional)" value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                    <select value={newType} onChange={e => setNewType(e.target.value)}
-                      className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400">
-                      <option value="INTERNAL">Personal Interno</option>
-                      <option value="EXTERNAL">Personal Externo</option>
-                    </select>
-                    <button type="submit" disabled={saving}
-                      className="text-white py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
-                      style={{ background: "linear-gradient(135deg, #f97316, #ef4444)" }}>
-                      Agregar
-                    </button>
-                  </form>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-                    <h2 className="font-bold text-gray-900">Personas ({shown.length})</h2>
-                    <label className="flex items-center gap-2 text-sm text-gray-500 cursor-pointer">
-                      <input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} className="rounded" />
-                      Ver inactivos
-                    </label>
-                  </div>
-                  {[{ label: "Interno", list: internal }, { label: "Externo", list: external }].map(({ label, list }) =>
-                    list.length > 0 && (
-                      <div key={label}>
-                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest px-4 pt-3 pb-1">{label} ({list.length})</p>
-                        {list.map(p => (
-                          <div key={p.id} className="flex items-center justify-between px-4 py-3 border-b border-gray-50 last:border-0">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${avatarColor(p.name)} ${!p.active ? "opacity-40" : ""}`}>
-                                {initials(p.name)}
-                              </div>
-                              <div>
-                                <p className={`text-sm font-semibold ${p.active ? "text-gray-900" : "text-gray-400"}`}>{p.name}</p>
-                                {p.email && <p className="text-xs text-gray-400">{p.email}</p>}
-                              </div>
-                            </div>
-                            <button onClick={() => toggleActive(p)}
-                              className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors ${
-                                p.active ? "bg-red-50 text-red-500 hover:bg-red-100" : "bg-green-50 text-green-600 hover:bg-green-100"
-                              }`}>
-                              {p.active ? "Desactivar" : "Activar"}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-
+        <>
             {/* ── USERS TAB ── */}
             {activeTab === "users" && (
               <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -258,7 +149,6 @@ export default function AdminClient() {
                   </div>
                 ) : (
                   users.map(u => {
-                    const linkedPerson = people.find(p => p.id === u.personId);
                     return (
                       <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
                         {u.image ? (
@@ -277,7 +167,7 @@ export default function AdminClient() {
                             )}
                           </div>
                           <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                          {linkedPerson && <p className="text-xs text-emerald-600 truncate">→ {linkedPerson.name}</p>}
+                          <p className="text-xs text-emerald-600">{u.personId ? "Vinculado" : "Sin vincular"}</p>
                         </div>
                         <button onClick={() => toggleRole(u)}
                           className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap ${
@@ -333,7 +223,7 @@ export default function AdminClient() {
             )}
 
             {/* ── REPORTS TAB ── */}
-            {activeTab === "reports" && <ReportsTab people={people.filter(p => p.active)} />}
+            {activeTab === "reports" && <ReportsTab users={users} />}
 
             {/* ── CONFIG TAB ── */}
             {activeTab === "config" && (
@@ -364,8 +254,7 @@ export default function AdminClient() {
                 </div>
               </div>
             )}
-          </>
-        )}
+        </>
       </main>
     </div>
   );
@@ -411,9 +300,9 @@ function LeaderCard({ title, emoji, entries, valueKey, unit, gradient }: LeaderC
 
 /* ── Reports Tab ── */
 
-interface ReportsTabProps { people: Person[] }
+interface ReportsTabProps { users: UserRecord[] }
 
-function ReportsTab({ people }: ReportsTabProps) {
+function ReportsTab({ users }: ReportsTabProps) {
   const [mode, setMode] = useState<"month" | "week">("month");
   const [refDate, setRefDate] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -457,14 +346,15 @@ function ReportsTab({ people }: ReportsTabProps) {
     return schedules.filter(s => s.personId === personId && s.status === status).length;
   }
 
+  const registeredUsers = users.filter(u => u.personId);
+
   function downloadCSV() {
-    const header = ["Nombre", "Tipo", ...days.map(d => format(d, "dd/MM")), ...ALL_STATUSES.map(s => `Total ${s}`), "Total días"];
-    const rows = people.map(p => [
-      p.name,
-      p.type === "INTERNAL" ? "Interno" : "Externo",
-      ...days.map(d => getStatus(p.id, d)),
-      ...ALL_STATUSES.map(s => String(countSt(p.id, s))),
-      String(schedules.filter(s => s.personId === p.id && days.some(d => s.date.startsWith(format(d, "yyyy-MM-dd")))).length),
+    const header = ["Nombre", ...days.map(d => format(d, "dd/MM")), ...ALL_STATUSES.map(s => `Total ${s}`), "Total días"];
+    const rows = registeredUsers.map(u => [
+      u.name || u.email || "",
+      ...days.map(d => getStatus(u.personId!, d)),
+      ...ALL_STATUSES.map(s => String(countSt(u.personId!, s))),
+      String(schedules.filter(s => s.personId === u.personId && days.some(d => s.date.startsWith(format(d, "yyyy-MM-dd")))).length),
     ]);
     const csv = [header, ...rows].map(r => r.map(c => `"${c}"`).join(",")).join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
@@ -537,7 +427,7 @@ function ReportsTab({ people }: ReportsTabProps) {
           <div className="p-4 border-b border-gray-100 flex items-center justify-between">
             <div>
               <h3 className="font-bold text-gray-900">Vista previa</h3>
-              <p className="text-xs text-gray-400 mt-0.5">{people.length} personas · {days.length} días hábiles</p>
+              <p className="text-xs text-gray-400 mt-0.5">{registeredUsers.length} usuarios · {days.length} días hábiles</p>
             </div>
             <button onClick={downloadCSV}
               className="flex items-center gap-1.5 text-white text-sm px-3 py-1.5 rounded-xl font-semibold"
@@ -562,18 +452,19 @@ function ReportsTab({ people }: ReportsTabProps) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {people.map(p => {
-                  const ofCount = countSt(p.id, "Of");
-                  const tbCount = countSt(p.id, "Tb");
+                {registeredUsers.map(u => {
+                  const pid = u.personId!;
+                  const ofCount = countSt(pid, "Of");
+                  const tbCount = countSt(pid, "Tb");
                   const other = (schedules as Schedule[]).filter(s =>
-                    s.personId === p.id && s.status !== "Of" && s.status !== "Tb" &&
+                    s.personId === pid && s.status !== "Of" && s.status !== "Tb" &&
                     days.some(d => s.date.startsWith(format(d, "yyyy-MM-dd")))
                   ).length;
                   return (
-                    <tr key={p.id} className="hover:bg-gray-50">
-                      <td className="px-3 py-2 font-semibold text-gray-800 sticky left-0 bg-white truncate max-w-[120px]">{p.name}</td>
+                    <tr key={u.id} className="hover:bg-gray-50">
+                      <td className="px-3 py-2 font-semibold text-gray-800 sticky left-0 bg-white truncate max-w-[120px]">{u.name || u.email}</td>
                       {days.map(d => {
-                        const status = getStatus(p.id, d);
+                        const status = getStatus(pid, d);
                         return (
                           <td key={d.toISOString()} className="px-1 py-2 text-center">
                             {status ? (
