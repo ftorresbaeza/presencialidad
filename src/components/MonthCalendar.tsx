@@ -99,7 +99,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
       }
       if (status !== null) setSavedStatus(status);
       await fetchSchedules();
-      setTimeout(() => { setSelectedDay(null); setSavedStatus(null); }, 800);
+      // No cerrar automáticamente — el usuario ve el conteo actualizado y cierra cuando quiera
     } catch { setSaveError("Error de conexión"); }
     finally { setSaving(false); }
   }
@@ -114,15 +114,17 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const weekEnd = endOfWeek(currentDate, { weekStartsOn: 1 });
   const weekDays = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
-  // Today stats
-  const todaySchedules = getDaySchedules(new Date());
-  const todayOf = todaySchedules.filter(s => s.status === "Of").length;
-  const todayFree = maxSeats - todayOf;
-
   const selDay = selectedDay;
   const selSchedules = selDay ? getDaySchedules(selDay) : [];
   const selOfCount = selSchedules.filter(s => s.status === "Of").length;
   const selFree = maxSeats - selOfCount;
+
+  // Stats: usa el día seleccionado si hay uno, si no usa hoy
+  const statsDay = selDay ?? new Date();
+  const statsSchedules = getDaySchedules(statsDay);
+  const statsOf = statsSchedules.filter(s => s.status === "Of").length;
+  const statsFree = maxSeats - statsOf;
+  const statsIsToday = isToday(statsDay);
 
   return (
     <div className="flex flex-col gap-4">
@@ -130,16 +132,20 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
       {/* Stats row */}
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-2xl p-4 text-white" style={{ background: "linear-gradient(135deg, #f97316 0%, #ef4444 100%)" }}>
-          <p className="text-xs font-semibold text-white/70 mb-1">En oficina hoy</p>
-          <p className="text-3xl font-black">{loading ? "—" : todayOf}</p>
+          <p className="text-xs font-semibold text-white/70 mb-1">
+            {statsIsToday ? "En oficina hoy" : `En oficina · ${format(statsDay, "d MMM", { locale: es })}`}
+          </p>
+          <p className="text-3xl font-black">{loading ? "—" : statsOf}</p>
           <p className="text-xs text-white/60 mt-1">de {maxSeats} puestos</p>
         </div>
         <div className="rounded-2xl p-4 text-white" style={{ background: "#1a1a2e" }}>
           <p className="text-xs font-semibold text-white/50 mb-1">Puestos libres</p>
-          <p className={`text-3xl font-black ${todayFree <= 0 ? "text-red-400" : todayFree <= 3 ? "text-amber-400" : "text-white"}`}>
-            {loading ? "—" : todayFree}
+          <p className={`text-3xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
+            {loading ? "—" : statsFree}
           </p>
-          <p className="text-xs text-white/40 mt-1">disponibles hoy</p>
+          <p className="text-xs text-white/40 mt-1">
+            {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
+          </p>
         </div>
       </div>
 
