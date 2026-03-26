@@ -32,72 +32,68 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
 
-  const body = await req.json();
-  const { personId, date, status } = body;
+    const body = await req.json();
+    const { personId, date, status } = body;
 
-  if (!personId || !date || !status) {
-    return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
-  }
+    if (!personId || !date || !status) {
+      return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
+    }
 
-  // Verify the authenticated user owns this personId, or is admin
-  const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
-  const isAdmin = dbUser?.role === "ADMIN";
-  if (!isAdmin && (!dbUser?.personId || dbUser.personId !== personId)) {
-    return NextResponse.json({ error: "No tienes permiso para editar esta persona" }, { status: 403 });
-  }
+    // Verify the authenticated user owns this personId, or is admin
+    const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const isAdmin = (dbUser as { role?: string })?.role === "ADMIN";
+    if (!isAdmin && (!dbUser?.personId || dbUser.personId !== personId)) {
+      return NextResponse.json({
+        error: `Sin permiso: tu personId=${dbUser?.personId}, solicitado=${personId}`,
+      }, { status: 403 });
+    }
 
-  // Parse as local date to avoid UTC-offset rejecting "today" in Chile
-  const scheduleDate = parseLocalDate(date);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  if (scheduleDate < today) {
-    return NextResponse.json({ error: "No puedes editar fechas pasadas" }, { status: 400 });
-  }
+    // Parse as local date to avoid UTC-offset rejecting "today" in Chile
+    const scheduleDate = parseLocalDate(date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    if (scheduleDate < today) {
+      return NextResponse.json({ error: "No puedes editar fechas pasadas" }, { status: 400 });
+    }
 
-  const schedule = await prisma.schedule.upsert({
-    where: { personId_date: { personId, date: scheduleDate } },
-    update: { status: status as StatusCode },
-    create: { personId, date: scheduleDate, status: status as StatusCode },
-    include: { person: { select: { name: true } } },
-  });
-
-  // Push notifications for Of reservations
-  if (status === "Of") {
-    const config = await prisma.config.findUnique({ where: { id: "main" } });
-    const maxSeats = config?.maxSeats || 30;
-
-    const officeCount = await prisma.schedule.count({
-      where: { date: scheduleDate, status: "Of" },
+    const schedule = await prisma.schedule.upsert({
+      where: { personId_date: { personId, date: scheduleDate } },
+      update: { status: status as StatusCode },
+      create: { personId, date: scheduleDate, status: status as StatusCode },
+      include: { person: { select: { name: true } } },
     });
 
-    const subs = await prisma.pushSubscription.findMany();
-
-    if (officeCount >= Math.ceil(maxSeats * 0.9)) {
-      const remaining = maxSeats - officeCount;
-      for (const sub of subs) {
-        await sendPushNotification(sub, {
-          title: "Oficina casi llena",
-          body: `Solo quedan ${remaining} puestos para el ${scheduleDate.toLocaleDateString("es-CL")}`,
-          url: "/",
-        });
-      }
-    } else {
-      for (const sub of subs) {
-        await sendPushNotification(sub, {
-          title: "Nueva reserva en oficina",
-          body: `${schedule.person.name} estará en oficina el ${scheduleDate.toLocaleDateString("es-CL")}`,
-          url: "/",
-        });
-      }
+    // Push notifications — fire and forget, never block the response
+    if (status === "Of") {
+      Promise.resolve().then(async () => {
+        try {
+          const config = await prisma.config.findUnique({ where: { id: "main" } });
+          const maxSeats = config?.maxSeats || 30;
+          const officeCount = await prisma.schedule.count({ where: { date: scheduleDate, status: "Of" } });
+          const subs = await prisma.pushSubscription.findMany();
+          const remaining = maxSeats - officeCount;
+          for (const sub of subs) {
+            await sendPushNotification(sub, officeCount >= Math.ceil(maxSeats * 0.9)
+              ? { title: "Oficina casi llena", body: `Solo quedan ${remaining} puestos para el ${scheduleDate.toLocaleDateString("es-CL")}`, url: "/" }
+              : { title: "Nueva reserva en oficina", body: `${schedule.person.name} estará en oficina el ${scheduleDate.toLocaleDateString("es-CL")}`, url: "/" }
+            );
+          }
+        } catch (e) { console.error("Push error:", e); }
+      });
     }
-  }
 
-  return NextResponse.json(schedule, { status: 201 });
+    return NextResponse.json(schedule, { status: 201 });
+  } catch (err) {
+    console.error("POST /api/schedules error:", err);
+    const msg = err instanceof Error ? err.message : "Error interno";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
 }
 
 export async function DELETE(req: NextRequest) {
