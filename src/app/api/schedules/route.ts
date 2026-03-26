@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
   const { personId, date, status } = body;
 
   if (!personId || !date || !status) {
-    return NextResponse.json({ error: "personId, date, status required" }, { status: 400 });
+    return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
   }
 
   // Parse as local date to avoid UTC-offset rejecting "today" in Chile
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (scheduleDate < today) {
-    return NextResponse.json({ error: "Cannot edit past dates" }, { status: 400 });
+    return NextResponse.json({ error: "No puedes editar fechas pasadas" }, { status: 400 });
   }
 
   const schedule = await prisma.schedule.upsert({
@@ -100,7 +100,7 @@ export async function DELETE(req: NextRequest) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   if (scheduleDate < today) {
-    return NextResponse.json({ error: "Cannot delete past dates" }, { status: 400 });
+    return NextResponse.json({ error: "No puedes eliminar fechas pasadas" }, { status: 400 });
   }
 
   await prisma.schedule.deleteMany({
