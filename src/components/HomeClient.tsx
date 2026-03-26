@@ -16,10 +16,9 @@ interface HomeClientProps {
   userName: string;
   userImage: string | null;
   isAdmin: boolean;
-  allPeople: Person[];
 }
 
-export default function HomeClient({ currentPerson, maxSeats, userName, userImage, isAdmin, allPeople }: HomeClientProps) {
+export default function HomeClient({ currentPerson, maxSeats, userName, userImage, isAdmin }: HomeClientProps) {
   return (
     <div className="min-h-screen" style={{ background: "#F4F5F7" }}>
       {/* Header */}
@@ -69,8 +68,6 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
         <MonthCalendar
           currentPerson={currentPerson}
           maxSeats={maxSeats}
-          isAdmin={isAdmin}
-          allPeople={allPeople}
         />
 
         {!isAdmin && (

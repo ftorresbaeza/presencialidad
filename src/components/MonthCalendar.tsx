@@ -16,8 +16,6 @@ interface Schedule {
 interface Props {
   currentPerson: Person | null;
   maxSeats: number;
-  isAdmin?: boolean;
-  allPeople?: Person[];
 }
 
 const DOW = ["L", "M", "X", "J", "V", "S", "D"];
@@ -49,14 +47,7 @@ function initials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-const AVATAR_BG = ["bg-orange-400","bg-emerald-500","bg-blue-500","bg-purple-500","bg-pink-500","bg-cyan-500","bg-indigo-500","bg-amber-500"];
-function avatarColor(name: string) {
-  let h = 0;
-  for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_BG.length;
-  return AVATAR_BG[h];
-}
-
-export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeople }: Props) {
+export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +56,6 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedStatus, setSavedStatus] = useState<StatusCode | null>(null);
   const [weekView, setWeekView] = useState(false);
-  const [adminPersonId, setAdminPersonId] = useState<string>(currentPerson?.id ?? "");
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
@@ -78,7 +68,6 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
   }, [year, month]);
 
   useEffect(() => { fetchSchedules(); }, [fetchSchedules]);
-  useEffect(() => { if (currentPerson && !adminPersonId) setAdminPersonId(currentPerson.id); }, [currentPerson, adminPersonId]);
 
   const days = eachDayOfInterval({ start: startOfMonth(currentDate), end: endOfMonth(currentDate) });
   const firstDow = (getDay(startOfMonth(currentDate)) + 6) % 7;
@@ -92,26 +81,16 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
 
   const canEdit = (d: Date) => !isPast(d) || isSameDay(d, new Date());
 
-  const effectivePersonId = isAdmin && adminPersonId ? adminPersonId : currentPerson?.id;
-  const effectivePerson = isAdmin && allPeople
-    ? allPeople.find(p => p.id === adminPersonId) ?? currentPerson
-    : currentPerson;
-
-  const getEffectiveStatus = (d: Date): StatusCode | null => {
-    if (!effectivePerson) return null;
-    return getDaySchedules(d).find(s => s.personId === effectivePerson.id)?.status ?? null;
-  };
-
   async function saveStatus(date: Date, status: StatusCode | null) {
-    if (!effectivePersonId) return;
+    if (!currentPerson) return;
     setSaving(true); setSaveError(null); setSavedStatus(null);
     try {
       const dateStr = format(date, "yyyy-MM-dd");
       const res = status === null
-        ? await fetch(`/api/schedules?personId=${effectivePersonId}&date=${dateStr}`, { method: "DELETE" })
+        ? await fetch(`/api/schedules?personId=${currentPerson.id}&date=${dateStr}`, { method: "DELETE" })
         : await fetch("/api/schedules", {
             method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ personId: effectivePersonId, date: dateStr, status }),
+            body: JSON.stringify({ personId: currentPerson.id, date: dateStr, status }),
           });
       if (!res.ok) {
         const e = await res.json().catch(() => ({}));
@@ -120,7 +99,6 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
       }
       if (status !== null) setSavedStatus(status);
       await fetchSchedules();
-      // Close modal after save
       setTimeout(() => { setSelectedDay(null); setSavedStatus(null); }, 800);
     } catch { setSaveError("Error de conexión"); }
     finally { setSaving(false); }
@@ -306,21 +284,8 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
             {/* Scrollable body */}
             <div className="overflow-y-auto flex-1">
 
-              {/* Admin selector */}
-              {isAdmin && allPeople && allPeople.length > 0 && canEdit(selDay) && (
-                <div className="px-5 py-3 border-b border-gray-100">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Registrar para</p>
-                  <select value={adminPersonId} onChange={e => setAdminPersonId(e.target.value)}
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-orange-400">
-                    {allPeople.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}{p.id === currentPerson?.id ? " (yo)" : ""}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
               {/* Status selector — only for registered users */}
-              {canEdit(selDay) && effectivePerson ? (
+              {canEdit(selDay) && currentPerson ? (
                 <div className="px-5 py-4">
 
                   {/* Success feedback */}
@@ -339,20 +304,18 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
                   )}
 
                   {/* Current status (if set) */}
-                  {getEffectiveStatus(selDay) && !savedStatus && (
+                  {getMyStatus(selDay) && !savedStatus && (
                     <div className="mb-4">
-                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">
-                        {isAdmin && effectivePerson.id !== currentPerson?.id ? `Estado actual de ${effectivePerson.name.split(" ")[0]}` : "Tu estado actual"}
-                      </p>
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Tu estado actual</p>
                       <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border-2"
                         style={{ borderColor: "#f97316", background: "linear-gradient(135deg,#fff7ed,#fef2f2)" }}>
-                        <span className="text-2xl">{STATUS_UI[getEffectiveStatus(selDay)!].icon}</span>
+                        <span className="text-2xl">{STATUS_UI[getMyStatus(selDay)!].icon}</span>
                         <div className="flex-1">
-                          <p className="font-black text-gray-900">{STATUS_LABELS[getEffectiveStatus(selDay)!]}</p>
+                          <p className="font-black text-gray-900">{STATUS_LABELS[getMyStatus(selDay)!]}</p>
                           <p className="text-xs text-gray-400">Toca otra opción para cambiar</p>
                         </div>
                         <span className="text-xs font-black text-orange-500 bg-orange-100 px-2 py-1 rounded-lg">
-                          {getEffectiveStatus(selDay)}
+                          {getMyStatus(selDay)}
                         </span>
                       </div>
                     </div>
@@ -360,14 +323,14 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
 
                   {/* Status buttons */}
                   <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
-                    {getEffectiveStatus(selDay) ? "Cambiar a" : (isAdmin && effectivePerson.id !== currentPerson?.id ? `¿Dónde estará ${effectivePerson.name.split(" ")[0]}?` : "¿Dónde estarás?")}
+                    {getMyStatus(selDay) ? "Cambiar a" : "¿Dónde estarás?"}
                   </p>
 
                   {/* Primary options: Of and Tb */}
                   <div className="grid grid-cols-2 gap-2 mb-2">
                     {(["Of", "Tb"] as StatusCode[]).map(status => {
-                      const full = status === "Of" && selFree <= 0 && getEffectiveStatus(selDay) !== "Of";
-                      const active = getEffectiveStatus(selDay) === status;
+                      const full = status === "Of" && selFree <= 0 && getMyStatus(selDay) !== "Of";
+                      const active = getMyStatus(selDay) === status;
                       const ui = STATUS_UI[status];
                       return (
                         <button key={status} disabled={full || saving} onClick={() => saveStatus(selDay, status)}
@@ -388,7 +351,7 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
                   {/* Secondary options */}
                   <div className="grid grid-cols-2 gap-2">
                     {(ALL_STATUSES.filter(s => s !== "Of" && s !== "Tb") as StatusCode[]).map(status => {
-                      const active = getEffectiveStatus(selDay) === status;
+                      const active = getMyStatus(selDay) === status;
                       const ui = STATUS_UI[status];
                       return (
                         <button key={status} disabled={saving} onClick={() => saveStatus(selDay, status)}
@@ -407,7 +370,7 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
                   </div>
 
                   {/* Remove */}
-                  {getEffectiveStatus(selDay) && !saving && !savedStatus && (
+                  {getMyStatus(selDay) && !saving && !savedStatus && (
                     <button onClick={() => saveStatus(selDay, null)}
                       className="w-full mt-3 py-2.5 text-sm text-red-400 hover:bg-red-50 rounded-xl transition-colors font-semibold border border-red-100">
                       Quitar mi estado
@@ -421,59 +384,11 @@ export default function MonthCalendar({ currentPerson, maxSeats, isAdmin, allPeo
                     </div>
                   )}
                 </div>
-              ) : canEdit(selDay) && !effectivePerson ? (
-                <div className="px-5 py-8 text-center text-gray-400 text-sm">
-                  Inicia sesión para registrar tu presencia
-                </div>
-              ) : (
-                <div className="px-5 py-4 text-center text-gray-400 text-sm">
+              ) : !canEdit(selDay) ? (
+                <div className="px-5 py-6 text-center text-gray-400 text-sm">
                   No puedes editar fechas pasadas
                 </div>
-              )}
-
-              {/* People in office */}
-              {selSchedules.filter(s => s.status === "Of").length > 0 && (
-                <div className="px-5 pb-4 border-t border-gray-100">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-4 mb-3">
-                    En oficina · {selSchedules.filter(s => s.status === "Of").length}
-                  </p>
-                  <div className="flex flex-col gap-2.5">
-                    {selSchedules.filter(s => s.status === "Of").map(s => (
-                      <div key={s.id} className="flex items-center gap-3">
-                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0 ${avatarColor(s.person.name)}`}>
-                          {initials(s.person.name)}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-semibold text-gray-800 truncate">{s.person.name}</p>
-                          <p className="text-xs text-gray-400">{s.person.type === "INTERNAL" ? "Interno" : "Externo"}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Other statuses */}
-              {selSchedules.filter(s => s.status !== "Of").length > 0 && (
-                <div className="px-5 pb-6 border-t border-gray-100">
-                  <p className="text-xs font-bold text-gray-400 uppercase tracking-widest pt-4 mb-2">Otros estados</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {selSchedules.filter(s => s.status !== "Of").map(s => {
-                      const ui = STATUS_UI[s.status];
-                      return (
-                        <span key={s.id} className={`flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-full ${ui.bg} ${ui.text}`}>
-                          {ui.icon} {s.person.name.split(" ")[0]}
-                          <span className="font-black">· {s.status}</span>
-                        </span>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {selSchedules.length === 0 && canEdit(selDay) && effectivePerson && (
-                <div className="text-center text-gray-300 text-sm pb-4">Nadie registrado aún en este día</div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
