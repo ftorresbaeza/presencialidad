@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { StatusCode } from "@prisma/client";
 import { sendPushNotification } from "@/lib/webpush";
+import { auth } from "@/auth";
 
 /** Parse "yyyy-MM-dd" as a local-midnight Date to avoid UTC offset issues */
 function parseLocalDate(dateStr: string): Date {
@@ -31,11 +32,22 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
   const body = await req.json();
   const { personId, date, status } = body;
 
   if (!personId || !date || !status) {
     return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
+  }
+
+  // Verify the authenticated user owns this personId
+  const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!dbUser?.personId || dbUser.personId !== personId) {
+    return NextResponse.json({ error: "No tienes permiso para editar esta persona" }, { status: 403 });
   }
 
   // Parse as local date to avoid UTC-offset rejecting "today" in Chile
@@ -88,12 +100,22 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  }
+
   const { searchParams } = new URL(req.url);
   const personId = searchParams.get("personId");
   const date = searchParams.get("date");
 
   if (!personId || !date) {
-    return NextResponse.json({ error: "personId and date required" }, { status: 400 });
+    return NextResponse.json({ error: "Faltan parámetros" }, { status: 400 });
+  }
+
+  const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
+  if (!dbUser?.personId || dbUser.personId !== personId) {
+    return NextResponse.json({ error: "No tienes permiso para editar esta persona" }, { status: 403 });
   }
 
   const scheduleDate = parseLocalDate(date);
