@@ -31,6 +31,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
   const [loading, setLoading] = useState(true);
   const [selectedDay, setSelectedDay] = useState<Date | null>(null);
   const [modalLoading, setModalLoading] = useState(false);
+  const [modalError, setModalError] = useState<string | null>(null);
   const [weekView, setWeekView] = useState(false);
 
   const year = currentDate.getFullYear();
@@ -80,14 +81,17 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
   async function saveStatus(date: Date, status: StatusCode | null) {
     if (!currentPerson) return;
     setModalLoading(true);
+    setModalError(null);
 
     try {
+      let res: Response;
       if (status === null) {
-        await fetch(`/api/schedules?personId=${currentPerson.id}&date=${format(date, "yyyy-MM-dd")}`, {
-          method: "DELETE",
-        });
+        res = await fetch(
+          `/api/schedules?personId=${currentPerson.id}&date=${format(date, "yyyy-MM-dd")}`,
+          { method: "DELETE" }
+        );
       } else {
-        await fetch("/api/schedules", {
+        res = await fetch("/api/schedules", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -97,8 +101,17 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
           }),
         });
       }
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Error al guardar" }));
+        setModalError(err.error || "Error al guardar");
+        return;
+      }
+
       await fetchSchedules();
       setSelectedDay(null);
+    } catch {
+      setModalError("Error de conexión");
     } finally {
       setModalLoading(false);
     }
@@ -270,9 +283,10 @@ export default function MonthCalendar({ currentPerson, maxSeats }: MonthCalendar
           myStatus={getMyStatusForDay(selectedDay)}
           maxSeats={maxSeats}
           loading={modalLoading}
+          error={modalError}
           currentPerson={currentPerson}
           onSave={saveStatus}
-          onClose={() => setSelectedDay(null)}
+          onClose={() => { setSelectedDay(null); setModalError(null); }}
         />
       )}
     </div>
@@ -383,12 +397,13 @@ interface DayModalProps {
   myStatus: StatusCode | null;
   maxSeats: number;
   loading: boolean;
+  error: string | null;
   currentPerson: Person | null;
   onSave: (date: Date, status: StatusCode | null) => void;
   onClose: () => void;
 }
 
-function DayModal({ day, schedules, myStatus, maxSeats, loading, currentPerson, onSave, onClose }: DayModalProps) {
+function DayModal({ day, schedules, myStatus, maxSeats, loading, error, currentPerson, onSave, onClose }: DayModalProps) {
   const officeSchedules = schedules.filter((s) => s.status === "Of");
   const isFull = officeSchedules.length >= maxSeats;
 
@@ -419,6 +434,20 @@ function DayModal({ day, schedules, myStatus, maxSeats, loading, currentPerson, 
             />
           </div>
         </div>
+
+        {/* Error message */}
+        {error && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Loading spinner */}
+        {loading && (
+          <div className="mx-4 mt-3 px-3 py-2 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-700 text-center">
+            Guardando...
+          </div>
+        )}
 
         {/* Status selector */}
         {currentPerson && (
