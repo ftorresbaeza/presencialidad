@@ -44,9 +44,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Faltan datos requeridos" }, { status: 400 });
   }
 
-  // Verify the authenticated user owns this personId
+  // Verify the authenticated user owns this personId, or is admin
   const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!dbUser?.personId || dbUser.personId !== personId) {
+  const isAdmin = dbUser?.role === "ADMIN";
+  if (!isAdmin && (!dbUser?.personId || dbUser.personId !== personId)) {
     return NextResponse.json({ error: "No tienes permiso para editar esta persona" }, { status: 403 });
   }
 
@@ -114,7 +115,8 @@ export async function DELETE(req: NextRequest) {
   }
 
   const dbUser = await prisma.user.findUnique({ where: { id: session.user.id } });
-  if (!dbUser?.personId || dbUser.personId !== personId) {
+  const isAdminDel = dbUser?.role === "ADMIN";
+  if (!isAdminDel && (!dbUser?.personId || dbUser.personId !== personId)) {
     return NextResponse.json({ error: "No tienes permiso para editar esta persona" }, { status: 403 });
   }
 

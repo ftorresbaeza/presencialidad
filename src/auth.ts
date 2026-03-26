@@ -42,6 +42,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (user?.id) {
         token.id = user.id;
         const dbUser = await prisma.user.findUnique({ where: { id: user.id } });
+        token.role = dbUser?.role ?? "USER";
         if (dbUser && !dbUser.personId) {
           const person = await autoLinkPerson(user.id, dbUser.email ?? null, dbUser.name ?? null);
           token.personId = person.id;
@@ -57,8 +58,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       if (!token.personId && token.id) {
         const dbUser = await prisma.user.findUnique({ where: { id: token.id as string } });
         if (dbUser) {
+          token.role = dbUser.role;
           if (!dbUser.personId) {
-            // Still not linked — run auto-link now
             const person = await autoLinkPerson(token.id as string, dbUser.email ?? null, dbUser.name ?? null);
             token.personId = person.id;
             token.personName = person.name;
@@ -75,8 +76,9 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
-        (session.user as { personId?: string; personName?: string }).personId = token.personId as string | undefined;
-        (session.user as { personId?: string; personName?: string }).personName = token.personName as string | undefined;
+        (session.user as { personId?: string; personName?: string; role?: string }).personId = token.personId as string | undefined;
+        (session.user as { personId?: string; personName?: string; role?: string }).personName = token.personName as string | undefined;
+        (session.user as { personId?: string; personName?: string; role?: string }).role = token.role as string | undefined;
       }
       return session;
     },

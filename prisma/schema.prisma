@@ -24,6 +24,11 @@ enum StatusCode {
   Cs
 }
 
+enum UserRole {
+  ADMIN
+  USER
+}
+
 model User {
   id            String    @id @default(cuid())
   name          String?
@@ -31,6 +36,7 @@ model User {
   emailVerified DateTime?
   image         String?
   personId      String?   @unique
+  role          UserRole  @default(USER)
   createdAt     DateTime  @default(now())
   accounts      Account[]
 }
