@@ -2,7 +2,7 @@
 
 import MonthCalendar from "./MonthCalendar";
 import NotificationButton from "./NotificationButton";
-import { STATUS_LABELS, STATUS_BADGE_COLORS, StatusCode, ALL_STATUSES } from "@/lib/constants";
+// status constants not needed here
 
 interface Person {
   id: string;
@@ -72,19 +72,6 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
           isAdmin={isAdmin}
           allPeople={allPeople}
         />
-
-        {/* Legend */}
-        <div className="mt-4 bg-white rounded-2xl shadow-sm p-4">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Leyenda</p>
-          <div className="grid grid-cols-2 gap-1.5">
-            {ALL_STATUSES.map((s) => (
-              <div key={s} className="flex items-center gap-2">
-                <span className={`text-xs font-bold px-1.5 py-0.5 rounded border ${STATUS_BADGE_COLORS[s as StatusCode]}`}>{s}</span>
-                <span className="text-xs text-gray-500">{STATUS_LABELS[s as StatusCode]}</span>
-              </div>
-            ))}
-          </div>
-        </div>
 
         {!isAdmin && (
           <div className="mt-3 text-center">

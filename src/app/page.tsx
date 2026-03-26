@@ -20,10 +20,17 @@ export default async function Home() {
 
   const config = await prisma.config.findUnique({ where: { id: "main" } });
 
-  // Admins get the full people list to assign schedules
-  const allPeople = isAdmin
+  // Only users who have registered via Google (have a linked User account)
+  const linkedUsers = await prisma.user.findMany({
+    where: { personId: { not: null } },
+    select: { personId: true },
+  });
+  const linkedPersonIds = linkedUsers.map(u => u.personId as string);
+
+  // Admins get the list of registered persons (only those linked to a Google account)
+  const allPeople = isAdmin && linkedPersonIds.length > 0
     ? await prisma.person.findMany({
-        where: { active: true },
+        where: { id: { in: linkedPersonIds }, active: true },
         select: { id: true, name: true, type: true },
         orderBy: { name: "asc" },
       })
