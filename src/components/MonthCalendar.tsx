@@ -336,6 +336,177 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
             )}
           </div>
         </div>
+
+        {selDay && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
+            onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}>
+            <div className="bg-white rounded-3xl w-full max-w-lg shadow-2xl max-h-[85vh] flex flex-col mx-4"
+              onClick={e => e.stopPropagation()}>
+              <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">
+                      {format(selDay, "EEEE", { locale: es })}
+                    </p>
+                    <h3 className="text-2xl font-black text-gray-900 capitalize mt-0.5">
+                      {format(selDay, "d 'de' MMMM", { locale: es })}
+                    </h3>
+                  </div>
+                  <button onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}
+                    className="w-10 h-10 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200">
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${selFree <= 0 ? "bg-red-400" : selFree <= 3 ? "bg-amber-400" : "bg-emerald-400"}`}
+                      style={{ width: `${Math.min(100, (selOfCount / maxSeats) * 100)}%` }} />
+                  </div>
+                  <span className={`text-base font-black whitespace-nowrap ${selFree <= 0 ? "text-red-500" : selFree <= 3 ? "text-amber-500" : "text-emerald-600"}`}>
+                    {selFree <= 0 ? "Sin puestos" : `${selFree} libres`}
+                  </span>
+                </div>
+              </div>
+
+              <div className="overflow-y-auto flex-1 px-6 py-4">
+                {canEdit(selDay) && currentPerson ? (
+                  <div>
+                    {savedStatus && (
+                      <div className="mb-4 flex items-center gap-3 px-5 py-4 rounded-2xl text-white text-base font-semibold"
+                        style={{ background: "#0073BF" }}>
+                        {getStatusIcon(savedStatus)}
+                        <span>Guardado: {STATUS_LABELS[savedStatus]}</span>
+                        <Check className="w-5 h-5 ml-auto" />
+                      </div>
+                    )}
+
+                    {saveError && (
+                      <div className="mb-4 px-5 py-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{saveError}</div>
+                    )}
+
+                    {getMyStatus(selDay) && !savedStatus && (
+                      <div className="mb-5">
+                        <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Tu estado actual</p>
+                        <div className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2"
+                          style={{ borderColor: "#0073BF", background: "#f0f9ff" }}>
+                          <div className="w-14 h-14 rounded-xl bg-[#0073BF]/10 flex items-center justify-center">
+                            {getStatusIcon(getMyStatus(selDay)!)}
+                          </div>
+                          <div className="flex-1">
+                            <p className="font-black text-gray-900 text-lg">{STATUS_LABELS[getMyStatus(selDay)!]}</p>
+                            <p className="text-sm text-gray-400">Toca otra opción para cambiar</p>
+                          </div>
+                          <span className="text-sm font-bold px-3 py-1.5 rounded-lg"
+                            style={getStatusBadgeStyle(getMyStatus(selDay)!)}>
+                            {getMyStatus(selDay)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">
+                      {getMyStatus(selDay) ? "Cambiar a" : "¿Dónde estarás?"}
+                    </p>
+
+                    <div className="grid grid-cols-2 gap-3 mb-5">
+                      {(["Of"] as StatusCode[]).map(status => {
+                        const full = selFree <= 0 && getMyStatus(selDay) !== "Of";
+                        const active = getMyStatus(selDay) === status;
+                        const ui = STATUS_UI[status];
+                        const Icon = STATUS_ICONS[status];
+                        return (
+                          <button key={status} disabled={full || saving} onClick={() => saveStatus(selDay, status)}
+                            className={`flex items-center gap-4 px-5 py-5 rounded-2xl font-semibold transition-all active:scale-[1.02] ${
+                              active ? "text-white shadow-lg" : `${ui.bg} ${ui.text} hover:opacity-90`
+                            } ${full ? "opacity-30 cursor-not-allowed" : ""}`}
+                            style={active ? { background: "#0073BF" } : {}}>
+                            <div className="w-12 h-12 rounded-xl flex items-center justify-center" 
+                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
+                              <Icon className="w-6 h-6" />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-black">{status}</p>
+                              <p className="text-sm leading-tight">{STATUS_LABELS[status]}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Divisiones</p>
+                    <div className="grid grid-cols-2 gap-3 mb-5">
+                      {(ALL_STATUSES.filter(s => ["DCH", "DMH", "DS", "DV", "DET"].includes(s)) as StatusCode[]).map(status => {
+                        const active = getMyStatus(selDay) === status;
+                        const ui = STATUS_UI[status];
+                        const Icon = STATUS_ICONS[status];
+                        return (
+                          <button key={status} disabled={saving} onClick={() => saveStatus(selDay, status)}
+                            className={`flex items-center gap-3 px-4 py-4 rounded-2xl font-semibold transition-all active:scale-[1.02] ${
+                              active ? "text-white shadow-md" : `${ui.bg} ${ui.text} hover:opacity-90`
+                            }`}
+                            style={active ? { background: "#0073BF" } : {}}>
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-black">{status}</p>
+                              <p className="text-xs leading-tight">{STATUS_LABELS[status]}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Otras</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {(ALL_STATUSES.filter(s => ["V", "Li", "Cs", "Tb"].includes(s)) as StatusCode[]).map(status => {
+                        const active = getMyStatus(selDay) === status;
+                        const ui = STATUS_UI[status];
+                        const Icon = STATUS_ICONS[status];
+                        return (
+                          <button key={status} disabled={saving} onClick={() => saveStatus(selDay, status)}
+                            className={`flex items-center gap-3 px-4 py-4 rounded-2xl font-semibold transition-all active:scale-[1.02] ${
+                              active ? "text-white shadow-md" : `${ui.bg} ${ui.text} hover:opacity-90"
+                            }`}
+                            style={active ? { background: "#0073BF" } : {}}>
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
+                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
+                              <Icon className="w-5 h-5" />
+                            </div>
+                            <div className="text-left">
+                              <p className="text-sm font-black">{status}</p>
+                              <p className="text-xs leading-tight">{STATUS_LABELS[status]}</p>
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {getMyStatus(selDay) && !saving && !savedStatus && (
+                      <button onClick={() => saveStatus(selDay, null)}
+                        className="w-full mt-5 py-3 text-base text-red-400 hover:bg-red-50 rounded-xl transition-colors font-semibold border border-red-100">
+                        Quitar mi estado
+                      </button>
+                    )}
+
+                    {saving && (
+                      <div className="flex items-center justify-center gap-3 mt-5 text-base text-gray-400">
+                        <div className="w-5 h-5 border-2 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
+                        Guardando...
+                      </div>
+                    )}
+                  </div>
+                ) : !canEdit(selDay) ? (
+                  <div className="py-8 text-center text-gray-400 text-base">
+                    No puedes editar fechas pasadas
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
