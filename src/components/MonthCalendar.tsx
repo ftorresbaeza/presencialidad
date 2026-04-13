@@ -86,7 +86,8 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
 
   useEffect(() => {
     const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= 768);
+      const width = window.innerWidth;
+      setIsDesktop(width >= 768);
     };
     checkDesktop();
     window.addEventListener("resize", checkDesktop);
