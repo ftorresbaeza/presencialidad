@@ -66,7 +66,7 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
         )}
       </header>
 
-      <main className="max-w-lg mx-auto px-4 py-4 pb-24">
+      <main className="mx-auto px-4 py-4 pb-24">
         <MonthCalendar
           currentPerson={currentPerson}
           maxSeats={maxSeats}

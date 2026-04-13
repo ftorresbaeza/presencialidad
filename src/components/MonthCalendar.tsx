@@ -157,29 +157,28 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
 
   if (isDesktop) {
     return (
-      <div className="flex gap-6 h-full">
-        <div className="flex-1 flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-2xl p-6 text-white" style={{ background: "#0073BF" }}>
-              <p className="text-sm font-semibold text-white/70 mb-2">
-                {statsIsToday ? "En oficina hoy" : `En oficina - ${format(statsDay, "d MMM", { locale: es })}`}
-              </p>
-              <p className="text-5xl font-black">{loading ? "-" : statsOf}</p>
-              <p className="text-sm text-white/60 mt-2">de {maxSeats} puestos</p>
-            </div>
-            <div className="rounded-2xl p-6 text-white" style={{ background: "#1a1a2e" }}>
-              <p className="text-sm font-semibold text-white/50 mb-2">Puestos libres</p>
-              <p className={`text-5xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
-                {loading ? "-" : statsFree}
-              </p>
-              <p className="text-sm text-white/40 mt-2">
-                {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
-              </p>
-            </div>
+      <div className="flex flex-col gap-6 h-full">
+        <div className="grid grid-cols-2 gap-4">
+          <div className="rounded-2xl p-6 text-white" style={{ background: "#0073BF" }}>
+            <p className="text-sm font-semibold text-white/70 mb-2">
+              {statsIsToday ? "En oficina hoy" : `En oficina - ${format(statsDay, "d MMM", { locale: es })}`}
+            </p>
+            <p className="text-5xl font-black">{loading ? "-" : statsOf}</p>
+            <p className="text-sm text-white/60 mt-2">de {maxSeats} puestos</p>
           </div>
+          <div className="rounded-2xl p-6 text-white" style={{ background: "#1a1a2e" }}>
+            <p className="text-sm font-semibold text-white/50 mb-2">Puestos libres</p>
+            <p className={`text-5xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
+              {loading ? "-" : statsFree}
+            </p>
+            <p className="text-sm text-white/40 mt-2">
+              {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
+            </p>
+          </div>
+        </div>
 
-          <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <button onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
                 className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
                 <ChevronLeft className="w-6 h-6" />
@@ -284,48 +283,6 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
                 </div>
               )}
             </div>
-          </div>
-        </div>
-
-        <div className="w-80 bg-white rounded-2xl shadow-sm p-5 flex flex-col overflow-hidden">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#0073BF]" />
-            Equipo
-          </h3>
-          
-          <div className="flex-1 overflow-auto">
-            {selDay ? (
-              <div>
-                <p className="text-sm font-semibold text-gray-500 mb-3 capitalize">
-                  {format(selDay, "d 'de' MMMM", { locale: es })}
-                </p>
-                <div className="space-y-2">
-                  {selSchedules.length === 0 ? (
-                    <p className="text-sm text-gray-400">No hay registros</p>
-                  ) : (
-                    selSchedules.map((s, idx) => {
-                      const Icon = STATUS_ICONS[s.status];
-                      return (
-                        <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-                          <div className="w-8 h-8 rounded-full bg-[#0073BF]/10 flex items-center justify-center">
-                            <Icon className="w-4 h-4 text-[#0073BF]" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-gray-900">{s.person.name}</p>
-                            <p className="text-xs text-gray-500">{STATUS_LABELS[s.status]}</p>
-                          </div>
-                          <span className="text-xs font-bold px-2 py-1 rounded-lg" style={getStatusBadgeStyle(s.status)}>
-                            {s.status}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Selecciona un día para ver el equipo</p>
-            )}
           </div>
         </div>
 
