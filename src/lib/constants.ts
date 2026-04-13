@@ -24,21 +24,21 @@ export const STATUS_LABELS: Record<StatusCode, string> = {
 };
 
 export const STATUS_COLORS: Record<StatusCode, string> = {
-  Of: "bg-green-500 text-white",
-  Tb: "bg-blue-500 text-white",
-  DCH: "bg-orange-400 text-white",
-  DMH: "bg-orange-500 text-white",
-  DS: "bg-amber-400 text-white",
-  DV: "bg-yellow-400 text-gray-900",
-  DET: "bg-amber-600 text-white",
+  Of: "bg-[#0073BF] text-white",
+  Tb: "bg-[#FFC600] text-gray-900",
+  DCH: "bg-[#F58427] text-white",
+  DMH: "bg-[#F58427] text-white",
+  DS: "bg-[#F58427] text-white",
+  DV: "bg-[#F58427] text-white",
+  DET: "bg-[#F58427] text-white",
   V: "bg-purple-500 text-white",
   Li: "bg-red-400 text-white",
   Cs: "bg-teal-500 text-white",
 };
 
 export const STATUS_BADGE_COLORS: Record<StatusCode, string> = {
-  Of: "bg-green-100 text-green-800 border-green-300",
-  Tb: "bg-blue-100 text-blue-800 border-blue-300",
+  Of: "bg-blue-100 text-blue-800 border-blue-300",
+  Tb: "bg-yellow-100 text-yellow-800 border-yellow-300",
   DCH: "bg-orange-100 text-orange-800 border-orange-300",
   DMH: "bg-orange-100 text-orange-900 border-orange-400",
   DS: "bg-amber-100 text-amber-800 border-amber-300",

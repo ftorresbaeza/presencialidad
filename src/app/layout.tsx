@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
+import InstallPWA from "@/components/InstallPWA";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -19,7 +20,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#1d4ed8",
+  themeColor: "#f97316",
 };
 
 export default function RootLayout({
@@ -34,6 +35,7 @@ export default function RootLayout({
       </head>
       <body className={`${inter.className} min-h-full bg-gray-50 antialiased`}>
         {children}
+        <InstallPWA />
         <script
           dangerouslySetInnerHTML={{
             __html: `

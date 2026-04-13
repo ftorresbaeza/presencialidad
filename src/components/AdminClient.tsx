@@ -4,6 +4,10 @@ import { useState, useEffect } from "react";
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, addWeeks, subWeeks } from "date-fns";
 import { es } from "date-fns/locale";
 import { STATUS_LABELS, StatusCode, ALL_STATUSES } from "@/lib/constants";
+import { 
+  Users, Settings, Download, ChevronLeft, ChevronRight, 
+  ArrowUp, Award, Building2, Home, Plane, Check, X, Shield
+} from "lucide-react";
 
 interface Schedule {
   personId: string; date: string; status: string;
@@ -12,9 +16,6 @@ interface Schedule {
 interface UserRecord {
   id: string; name: string | null; email: string | null; image: string | null;
   role: string; personId: string | null; createdAt: string;
-}
-interface LeaderEntry {
-  id: string; name: string; type: string; office: number; remote: number; travel: number; total: number;
 }
 
 const AVATAR_COLORS = [
@@ -30,15 +31,14 @@ function initials(name: string) {
   return name.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
 }
 
-type Tab = "users" | "leaderboard" | "reports" | "config";
+type Tab = "users" | "reports" | "config";
 
 export default function AdminClient() {
   const [maxSeats, setMaxSeats] = useState(30);
   const [saving, setSaving] = useState(false);
   const [seatInput, setSeatInput] = useState("30");
-  const [activeTab, setActiveTab] = useState<Tab>("users");
+  const [activeTab, setActiveTab] = useState<Tab | null>(null);
   const [users, setUsers] = useState<UserRecord[]>([]);
-  const [leaderboard, setLeaderboard] = useState<{ topOffice: LeaderEntry[]; topTravel: LeaderEntry[]; topRemote: LeaderEntry[] } | null>(null);
 
   useEffect(() => {
     fetch("/api/config").then(r => r.json()).then(d => {
@@ -53,16 +53,6 @@ export default function AdminClient() {
     const data = await res.json();
     setUsers(Array.isArray(data) ? data : []);
   }
-
-  async function loadLeaderboard() {
-    const res = await fetch("/api/leaderboard");
-    const data = await res.json();
-    setLeaderboard(data);
-  }
-
-  useEffect(() => {
-    if (activeTab === "leaderboard") loadLeaderboard();
-  }, [activeTab]);
 
   async function saveSeats() {
     const n = parseInt(seatInput);
@@ -88,7 +78,7 @@ export default function AdminClient() {
   }
 
   async function sendNotification() {
-    await fetch("/api/push/send", {
+    const res = await fetch("/api/push/send", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -97,212 +87,170 @@ export default function AdminClient() {
         url: "/",
       }),
     });
-    alert("Notificación enviada a todos los suscriptores");
+    const data = await res.json();
+    if (data.error) {
+      alert(`Error: ${data.error}`);
+    } else {
+      alert(`Enviado a ${data.sent} de ${data.total} suscriptores`);
+    }
   }
 
-  const TABS: { id: Tab; label: string }[] = [
-    { id: "users", label: "Usuarios" },
-    { id: "leaderboard", label: "Ranking" },
-    { id: "reports", label: "Reportes" },
-    { id: "config", label: "Config" },
+  const TABS: { id: Tab; label: string; icon: React.ElementType; desc: string; gradient: string }[] = [
+    { id: "users", label: "Usuarios", icon: Users, desc: "Gestionar accesos y roles", gradient: "#0073BF" },
+    { id: "reports", label: "Reportes", icon: Download, desc: "Exportar datos", gradient: "#10b981" },
+    { id: "config", label: "Config", icon: Settings, desc: "Ajustes del sistema", gradient: "#F58427" },
   ];
 
   return (
     <div className="min-h-screen" style={{ background: "#F4F5F7" }}>
       <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-          <a href="/" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 text-lg">←</a>
-          <div>
+          <a href="/" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+            <ChevronLeft className="w-5 h-5" />
+          </a>
+          <div className="flex-1">
             <p className="text-xs text-gray-400 leading-none">Codelco</p>
             <h1 className="font-black text-gray-900 text-base leading-tight">Administración</h1>
           </div>
+          {activeTab && (
+            <button
+              onClick={() => setActiveTab(null)}
+              className="text-xs text-gray-400 hover:text-gray-700 flex items-center gap-1"
+            >
+              Volver
+            </button>
+          )}
         </div>
       </header>
 
       <main className="max-w-2xl mx-auto px-4 py-4 pb-20">
-        {/* Tabs */}
-        <div className="flex gap-1.5 mb-4 overflow-x-auto pb-1 no-scrollbar">
-          {TABS.map(tab => (
-            <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-              className={`flex-none px-3 py-2 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
-                activeTab === tab.id
-                  ? "text-white shadow-sm"
-                  : "bg-white text-gray-500 border border-gray-200"
-              }`}
-              style={activeTab === tab.id ? { background: "linear-gradient(135deg, #f97316, #ef4444)" } : {}}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+        {!activeTab ? (
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className="relative overflow-hidden rounded-2xl p-4 text-center shadow-sm hover:scale-[1.02] active:scale-[0.98] transition-transform"
+                  style={{ background: tab.gradient }}
+                >
+                  <div className="flex justify-center">
+                    <Icon className="w-8 h-8 text-white" />
+                  </div>
+                  <p className="mt-2 font-black text-white text-sm">{tab.label}</p>
+                  <p className="text-[10px] text-white/70 mt-0.5">{tab.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar">
+            {TABS.map(tab => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex-none flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all ${
+                    activeTab === tab.id ? "text-white" : "bg-white text-gray-500"
+                  }`}
+                  style={activeTab === tab.id ? { background: tab.gradient } : {}}
+                >
+                  <Icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <>
-            {/* ── USERS TAB ── */}
-            {activeTab === "users" && (
-              <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                <div className="p-4 border-b border-gray-100">
-                  <h2 className="font-bold text-gray-900">Usuarios registrados</h2>
-                  <p className="text-xs text-gray-400 mt-0.5">Usuarios que han iniciado sesión con Google</p>
+          {activeTab === "users" && (
+            <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+              <div className="p-4 border-b border-gray-100">
+                <h2 className="font-bold text-gray-900">Usuarios registrados</h2>
+                <p className="text-xs text-gray-400 mt-0.5">Usuarios que han iniciado sesión con Google</p>
+              </div>
+              {users.length === 0 ? (
+                <div className="flex items-center justify-center h-32">
+                  <div className="w-5 h-5 border-2 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
                 </div>
-                {users.length === 0 ? (
-                  <div className="flex items-center justify-center h-32">
-                    <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  users.map(u => {
-                    return (
-                      <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-                        {u.image ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={u.image} alt={u.name || ""} className="w-9 h-9 rounded-full" referrerPolicy="no-referrer" />
-                        ) : (
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white ${avatarColor(u.name || u.email || "U")}`}>
-                            {initials(u.name || u.email || "U")}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-gray-900 truncate">{u.name || "Sin nombre"}</p>
-                            {u.role === "ADMIN" && (
-                              <span className="text-xs bg-orange-100 text-orange-600 font-bold px-1.5 py-0.5 rounded-full">Admin</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-400 truncate">{u.email}</p>
-                          <p className="text-xs text-emerald-600">{u.personId ? "Vinculado" : "Sin vincular"}</p>
+              ) : (
+                users.map(u => {
+                  return (
+                    <div key={u.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+                      {u.image ? (
+                        <img src={u.image} alt={u.name || ""} className="w-9 h-9 rounded-full" referrerPolicy="no-referrer" />
+                      ) : (
+                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold text-white ${avatarColor(u.name || u.email || "U")}`}>
+                          {initials(u.name || u.email || "U")}
                         </div>
-                        <button onClick={() => toggleRole(u)}
-                          className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap ${
-                            u.role === "ADMIN"
-                              ? "bg-orange-50 text-orange-500 hover:bg-orange-100"
-                              : "bg-gray-100 text-gray-500 hover:bg-gray-200"
-                          }`}>
-                          {u.role === "ADMIN" ? "Quitar admin" : "Hacer admin"}
-                        </button>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-gray-900 truncate">{u.name || "Sin nombre"}</p>
+                          {u.role === "ADMIN" && (
+                            <span className="text-xs bg-[#0073BF]/10 text-[#0073BF] font-bold px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                              <Shield className="w-3 h-3" /> Admin
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                        <p className="text-xs text-emerald-600">{u.personId ? "Vinculado" : "Sin vincular"}</p>
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            )}
+                      <button onClick={() => toggleRole(u)}
+                        className={`text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors whitespace-nowrap ${
+                          u.role === "ADMIN"
+                            ? "bg-red-50 text-red-500 hover:bg-red-100"
+                            : "bg-[#0073BF]/10 text-[#0073BF] hover:bg-[#0073BF]/20"
+                        }`}>
+                        {u.role === "ADMIN" ? "Quitar admin" : "Hacer admin"}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
 
-            {/* ── LEADERBOARD TAB ── */}
-            {activeTab === "leaderboard" && (
-              <div className="flex flex-col gap-4">
-                {!leaderboard ? (
-                  <div className="flex items-center justify-center h-40">
-                    <div className="w-6 h-6 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                ) : (
-                  <>
-                    <LeaderCard
-                      title="Más días en oficina"
-                      emoji="🏆"
-                      entries={leaderboard.topOffice}
-                      valueKey="office"
-                      unit="días"
-                      gradient="linear-gradient(135deg, #f97316, #ef4444)"
-                    />
-                    <LeaderCard
-                      title="Más comisiones de servicio"
-                      emoji="✈️"
-                      entries={leaderboard.topTravel}
-                      valueKey="travel"
-                      unit="días"
-                      gradient="linear-gradient(135deg, #3b82f6, #6366f1)"
-                    />
-                    <LeaderCard
-                      title="Más días en teletrabajo"
-                      emoji="🏠"
-                      entries={leaderboard.topRemote}
-                      valueKey="remote"
-                      unit="días"
-                      gradient="linear-gradient(135deg, #10b981, #06b6d4)"
-                    />
-                  </>
-                )}
-              </div>
-            )}
+          {activeTab === "reports" && <ReportsTab users={users} />}
 
-            {/* ── REPORTS TAB ── */}
-            {activeTab === "reports" && <ReportsTab users={users} />}
-
-            {/* ── CONFIG TAB ── */}
-            {activeTab === "config" && (
-              <div className="flex flex-col gap-4">
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h2 className="font-bold text-gray-900 mb-1">Puestos disponibles</h2>
-                  <p className="text-xs text-gray-400 mb-3">Número máximo de personas en oficina por día</p>
-                  <div className="flex gap-2">
-                    <input type="number" min={1} max={200} value={seatInput} onChange={e => setSeatInput(e.target.value)}
-                      className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400" />
-                    <button onClick={saveSeats} disabled={saving}
-                      className="text-white px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
-                      style={{ background: "linear-gradient(135deg, #f97316, #ef4444)" }}>
-                      Guardar
-                    </button>
-                  </div>
-                  <p className="text-xs text-gray-400 mt-2">Actual: <strong>{maxSeats} puestos</strong></p>
-                </div>
-
-                <div className="bg-white rounded-2xl shadow-sm p-4">
-                  <h2 className="font-bold text-gray-900 mb-1">Notificaciones Push</h2>
-                  <p className="text-xs text-gray-400 mb-3">Enviar recordatorio a todos los suscriptores</p>
-                  <button onClick={sendNotification}
-                    className="w-full text-white py-2.5 rounded-xl text-sm font-semibold"
-                    style={{ background: "linear-gradient(135deg, #f97316, #ef4444)" }}>
-                    Enviar recordatorio semanal
+          {activeTab === "config" && (
+            <div className="flex flex-col gap-4">
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <h2 className="font-bold text-gray-900 mb-1">Puestos disponibles</h2>
+                <p className="text-xs text-gray-400 mb-3">Número máximo de personas en oficina por día</p>
+                <div className="flex gap-2">
+                  <input type="number" min={1} max={200} value={seatInput} onChange={e => setSeatInput(e.target.value)}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#0073BF]" />
+                  <button onClick={saveSeats} disabled={saving}
+                    className="text-white px-4 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50"
+                    style={{ background: "#0073BF" }}>
+                    Guardar
                   </button>
                 </div>
+                <p className="text-xs text-gray-400 mt-2">Actual: <strong>{maxSeats} puestos</strong></p>
               </div>
-            )}
+
+              <div className="bg-white rounded-2xl shadow-sm p-4">
+                <h2 className="font-bold text-gray-900 mb-1">Notificaciones Push</h2>
+                <p className="text-xs text-gray-400 mb-3">Enviar recordatorio a todos los suscriptores</p>
+                <button onClick={sendNotification}
+                  className="w-full text-white py-2.5 rounded-xl text-sm font-semibold"
+                  style={{ background: "#0073BF" }}>
+                  Enviar recordatorio semanal
+                </button>
+              </div>
+            </div>
+          )}
         </>
       </main>
     </div>
   );
 }
 
-/* ── Leaderboard Card ── */
-
-interface LeaderCardProps {
-  title: string; emoji: string; entries: LeaderEntry[];
-  valueKey: "office" | "travel" | "remote";
-  unit: string; gradient: string;
-}
-
-function LeaderCard({ title, emoji, entries, valueKey, unit, gradient }: LeaderCardProps) {
-  const filtered = entries.filter(e => e[valueKey] > 0);
-  return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-      <div className="px-4 py-3 text-white" style={{ background: gradient }}>
-        <p className="text-sm font-black">{emoji} {title}</p>
-      </div>
-      {filtered.length === 0 ? (
-        <p className="text-center text-gray-300 text-sm py-6">Sin datos aún</p>
-      ) : (
-        filtered.slice(0, 5).map((e, i) => (
-          <div key={e.id} className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-            <span className={`w-6 text-center font-black text-sm ${i === 0 ? "text-amber-500" : i === 1 ? "text-gray-400" : i === 2 ? "text-orange-700" : "text-gray-300"}`}>
-              {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
-            </span>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900 truncate">{e.name}</p>
-              <p className="text-xs text-gray-400">{e.type === "INTERNAL" ? "Interno" : "Externo"}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-lg font-black text-gray-900">{e[valueKey]}</p>
-              <p className="text-xs text-gray-400">{unit}</p>
-            </div>
-          </div>
-        ))
-      )}
-    </div>
-  );
-}
-
-/* ── Reports Tab ── */
-
-interface ReportsTabProps { users: UserRecord[] }
-
-function ReportsTab({ users }: ReportsTabProps) {
+function ReportsTab({ users }: { users: UserRecord[] }) {
   const [mode, setMode] = useState<"month" | "week">("month");
   const [refDate, setRefDate] = useState(new Date());
   const [schedules, setSchedules] = useState<Schedule[]>([]);
@@ -314,7 +262,7 @@ function ReportsTab({ users }: ReportsTabProps) {
 
   const days = eachDayOfInterval(dateRange).filter(d => d.getDay() !== 0 && d.getDay() !== 6);
 
-  useEffect(() => { loadSchedules(); }, [refDate, mode]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadSchedules(); }, [refDate, mode]);
 
   async function loadSchedules() {
     setLoadingReport(true);
@@ -387,19 +335,23 @@ function ReportsTab({ users }: ReportsTabProps) {
           ))}
         </div>
         <div className="flex items-center justify-between">
-          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 text-lg">‹</button>
+          <button onClick={() => navigate(-1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+            <ChevronLeft className="w-5 h-5" />
+          </button>
           <span className="font-bold text-gray-900 capitalize text-sm">
             {mode === "month"
               ? format(refDate, "MMMM yyyy", { locale: es })
-              : `${format(dateRange.start, "d MMM", { locale: es })} – ${format(dateRange.end, "d MMM yyyy", { locale: es })}`}
+              : `${format(dateRange.start, "d MMM", { locale: es })} - ${format(dateRange.end, "d MMM yyyy", { locale: es })}`}
           </span>
-          <button onClick={() => navigate(1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600 text-lg">›</button>
+          <button onClick={() => navigate(1)} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
+            <ChevronRight className="w-5 h-5" />
+          </button>
         </div>
       </div>
 
       {!loadingReport && (
         <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-2xl p-3 text-center text-white" style={{ background: "linear-gradient(135deg, #f97316, #ef4444)" }}>
+          <div className="rounded-2xl p-3 text-center text-white" style={{ background: "#0073BF" }}>
             <p className="text-2xl font-black">{totalOf}</p>
             <p className="text-xs text-white/70">Visitas Of.</p>
           </div>
@@ -420,7 +372,7 @@ function ReportsTab({ users }: ReportsTabProps) {
 
       {loadingReport ? (
         <div className="flex items-center justify-center h-40">
-          <div className="w-5 h-5 border-2 border-orange-400 border-t-transparent rounded-full animate-spin" />
+          <div className="w-5 h-5 border-2 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
@@ -431,8 +383,8 @@ function ReportsTab({ users }: ReportsTabProps) {
             </div>
             <button onClick={downloadCSV}
               className="flex items-center gap-1.5 text-white text-sm px-3 py-1.5 rounded-xl font-semibold"
-              style={{ background: "linear-gradient(135deg, #10b981, #06b6d4)" }}>
-              ↓ CSV
+              style={{ background: "#10b981" }}>
+              <Download className="w-4 h-4" /> CSV
             </button>
           </div>
           <div className="overflow-x-auto">
@@ -446,7 +398,7 @@ function ReportsTab({ users }: ReportsTabProps) {
                       <div className="text-gray-400 font-normal">{format(d, "d")}</div>
                     </th>
                   ))}
-                  <th className="px-2 py-2 font-semibold text-emerald-600 text-center min-w-[36px]">Of</th>
+                  <th className="px-2 py-2 font-semibold text-[#0073BF] text-center min-w-[36px]">Of</th>
                   <th className="px-2 py-2 font-semibold text-blue-600 text-center min-w-[36px]">Tb</th>
                   <th className="px-2 py-2 font-semibold text-gray-500 text-center min-w-[36px]">+</th>
                 </tr>
@@ -469,19 +421,19 @@ function ReportsTab({ users }: ReportsTabProps) {
                           <td key={d.toISOString()} className="px-1 py-2 text-center">
                             {status ? (
                               <span className={`inline-block text-[10px] font-bold px-1 py-0.5 rounded ${
-                                status === "Of" ? "bg-emerald-100 text-emerald-700" :
-                                status === "Tb" ? "bg-blue-100 text-blue-700" :
+                                status === "Of" ? "bg-[#0073BF]/10 text-[#0073BF]" :
+                                status === "Tb" ? "bg-yellow-100 text-yellow-700" :
                                 status === "V" ? "bg-purple-100 text-purple-700" :
                                 status === "Li" ? "bg-red-100 text-red-700" :
                                 "bg-orange-100 text-orange-700"
                               }`}>{status}</span>
-                            ) : <span className="text-gray-200">—</span>}
+                            ) : <span className="text-gray-200">-</span>}
                           </td>
                         );
                       })}
-                      <td className="px-2 py-2 text-center font-bold text-emerald-700">{ofCount || "—"}</td>
-                      <td className="px-2 py-2 text-center font-bold text-blue-700">{tbCount || "—"}</td>
-                      <td className="px-2 py-2 text-center font-bold text-gray-500">{other || "—"}</td>
+                      <td className="px-2 py-2 text-center font-bold text-[#0073BF]">{ofCount || "-"}</td>
+                      <td className="px-2 py-2 text-center font-bold text-blue-700">{tbCount || "-"}</td>
+                      <td className="px-2 py-2 text-center font-bold text-gray-500">{other || "-"}</td>
                     </tr>
                   );
                 })}
