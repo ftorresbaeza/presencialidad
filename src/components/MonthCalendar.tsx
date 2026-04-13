@@ -82,18 +82,12 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [savedStatus, setSavedStatus] = useState<StatusCode | null>(null);
   const [weekView, setWeekView] = useState(false);
-  const [isDesktop, setIsDesktop] = useState(false);
   const [mounted, setMounted] = useState(false);
+
+  const isDesktop = true;
 
   useEffect(() => {
     setMounted(true);
-    const checkDesktop = () => {
-      const width = window.innerWidth;
-      setIsDesktop(width >= 1024); // Increased threshold for desktop
-    };
-    checkDesktop();
-    window.addEventListener("resize", checkDesktop);
-    return () => window.removeEventListener("resize", checkDesktop);
   }, []);
 
   const year = currentDate.getFullYear();
