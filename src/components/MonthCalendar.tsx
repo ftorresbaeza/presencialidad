@@ -85,7 +85,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [weekView, setWeekView] = useState(false);
   const isDesktop = true;
 
-  useEffect(() => {
+  const year = currentDate.getFullYear();
   const month = currentDate.getMonth() + 1;
 
   const fetchSchedules = useCallback(async () => {
@@ -157,28 +157,29 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
 
   if (isDesktop) {
     return (
-      <div className="flex flex-col gap-6 h-full">
-        <div className="grid grid-cols-2 gap-4">
-          <div className="rounded-2xl p-6 text-white" style={{ background: "#0073BF" }}>
-            <p className="text-sm font-semibold text-white/70 mb-2">
-              {statsIsToday ? "En oficina hoy" : `En oficina - ${format(statsDay, "d MMM", { locale: es })}`}
-            </p>
-            <p className="text-5xl font-black">{loading ? "-" : statsOf}</p>
-            <p className="text-sm text-white/60 mt-2">de {maxSeats} puestos</p>
+      <div className="flex gap-6 h-full">
+        <div className="flex-1 flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="rounded-2xl p-6 text-white" style={{ background: "#0073BF" }}>
+              <p className="text-sm font-semibold text-white/70 mb-2">
+                {statsIsToday ? "En oficina hoy" : `En oficina - ${format(statsDay, "d MMM", { locale: es })}`}
+              </p>
+              <p className="text-5xl font-black">{loading ? "-" : statsOf}</p>
+              <p className="text-sm text-white/60 mt-2">de {maxSeats} puestos</p>
+            </div>
+            <div className="rounded-2xl p-6 text-white" style={{ background: "#1a1a2e" }}>
+              <p className="text-sm font-semibold text-white/50 mb-2">Puestos libres</p>
+              <p className={`text-5xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
+                {loading ? "-" : statsFree}
+              </p>
+              <p className="text-sm text-white/40 mt-2">
+                {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
+              </p>
+            </div>
           </div>
-          <div className="rounded-2xl p-6 text-white" style={{ background: "#1a1a2e" }}>
-            <p className="text-sm font-semibold text-white/50 mb-2">Puestos libres</p>
-            <p className={`text-5xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
-              {loading ? "-" : statsFree}
-            </p>
-            <p className="text-sm text-white/40 mt-2">
-              {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
-            </p>
-          </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden flex flex-col">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
               <button onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
                 className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
                 <ChevronLeft className="w-6 h-6" />
@@ -286,174 +287,47 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
           </div>
         </div>
 
-        {selDay && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm"
-            onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}>
-            <div className="bg-white rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] flex flex-col mx-8"
-              onClick={e => e.stopPropagation()}>
-              <div className="px-8 pt-8 pb-6 border-b border-gray-100">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">
-                      {format(selDay, "EEEE", { locale: es })}
-                    </p>
-                    <h3 className="text-3xl font-black text-gray-900 capitalize mt-1">
-                      {format(selDay, "d 'de' MMMM", { locale: es })}
-                    </h3>
-                  </div>
-                  <button onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}
-                    className="w-12 h-12 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200">
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
-
-                <div className="mt-6 flex items-center gap-4">
-                  <div className="flex-1 h-3 bg-gray-100 rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full ${selFree <= 0 ? "bg-red-400" : selFree <= 3 ? "bg-amber-400" : "bg-emerald-400"}`}
-                      style={{ width: `${Math.min(100, (selOfCount / maxSeats) * 100)}%` }} />
-                  </div>
-                  <span className={`text-lg font-black whitespace-nowrap ${selFree <= 0 ? "text-red-500" : selFree <= 3 ? "text-amber-500" : "text-emerald-600"}`}>
-                    {selFree <= 0 ? "Sin puestos" : `${selFree} libres`}
-                  </span>
-                </div>
-              </div>
-
-              <div className="overflow-y-auto flex-1 px-8 py-6">
-                {canEdit(selDay) && currentPerson ? (
-                  <div>
-                    {savedStatus && (
-                      <div className="mb-6 flex items-center gap-4 px-6 py-5 rounded-2xl text-white text-base font-semibold"
-                        style={{ background: "#0073BF" }}>
-                        {getStatusIcon(savedStatus)}
-                        <span>Guardado: {STATUS_LABELS[savedStatus]}</span>
-                        <Check className="w-5 h-5 ml-auto" />
-                      </div>
-                    )}
-
-                    {saveError && (
-                      <div className="mb-6 px-6 py-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-600">{saveError}</div>
-                    )}
-
-                    {getMyStatus(selDay) && !savedStatus && (
-                      <div className="mb-6">
-                        <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Tu estado actual</p>
-                        <div className="flex items-center gap-5 px-6 py-5 rounded-2xl border-2"
-                          style={{ borderColor: "#0073BF", background: "#f0f9ff" }}>
-                          <div className="w-16 h-16 rounded-2xl bg-[#0073BF]/10 flex items-center justify-center">
-                            {getStatusIcon(getMyStatus(selDay)!)}
+        <div className="w-80 bg-white rounded-2xl shadow-sm p-5 flex flex-col overflow-hidden">
+          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-[#0073BF]" />
+            Equipo
+          </h3>
+          
+          <div className="flex-1 overflow-auto">
+            {selDay ? (
+              <div>
+                <p className="text-sm font-semibold text-gray-500 mb-3 capitalize">
+                  {format(selDay, "d 'de' MMMM", { locale: es })}
+                </p>
+                <div className="space-y-2">
+                  {selSchedules.length === 0 ? (
+                    <p className="text-sm text-gray-400">No hay registros</p>
+                  ) : (
+                    selSchedules.map((s, idx) => {
+                      const Icon = STATUS_ICONS[s.status];
+                      return (
+                        <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+                          <div className="w-8 h-8 rounded-full bg-[#0073BF]/10 flex items-center justify-center">
+                            <Icon className="w-4 h-4 text-[#0073BF]" />
                           </div>
                           <div className="flex-1">
-                            <p className="font-black text-gray-900 text-xl">{STATUS_LABELS[getMyStatus(selDay)!]}</p>
-                            <p className="text-base text-gray-400">Toca otra opción para cambiar</p>
+                            <p className="text-sm font-semibold text-gray-900">{s.person.name}</p>
+                            <p className="text-xs text-gray-500">{STATUS_LABELS[s.status]}</p>
                           </div>
-                          <span className="text-base font-bold px-4 py-2 rounded-lg"
-                            style={getStatusBadgeStyle(getMyStatus(selDay)!)}>
-                            {getMyStatus(selDay)}
+                          <span className="text-xs font-bold px-2 py-1 rounded-lg" style={getStatusBadgeStyle(s.status)}>
+                            {s.status}
                           </span>
                         </div>
-                      </div>
-                    )}
-
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">
-                      {getMyStatus(selDay) ? "Cambiar a" : "¿Dónde estarás?"}
-                    </p>
-
-                    <div className="grid grid-cols-2 gap-4 mb-8">
-                      {(["Of"] as StatusCode[]).map(status => {
-                        const full = selFree <= 0 && getMyStatus(selDay) !== "Of";
-                        const active = getMyStatus(selDay) === status;
-                        const ui = STATUS_UI[status];
-                        const Icon = STATUS_ICONS[status];
-                        return (
-                          <button key={status} disabled={full || saving} onClick={() => saveStatus(selDay, status)}
-                            className={`flex items-center gap-5 px-6 py-6 rounded-2xl font-semibold transition-all active:scale-[1.02] ${
-                              active ? "text-white shadow-lg" : `${ui.bg} ${ui.text} hover:opacity-90`
-                            } ${full ? "opacity-30 cursor-not-allowed" : ""}`}
-                            style={active ? { background: "#0073BF" } : {}}>
-                            <div className="w-14 h-14 rounded-xl flex items-center justify-center" 
-                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
-                              <Icon className="w-7 h-7" />
-                            </div>
-                            <div className="text-left">
-                              <p className="text-base font-black">{status}</p>
-                              <p className="text-base leading-tight">{STATUS_LABELS[status]}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Divisiones</p>
-                    <div className="grid grid-cols-3 gap-4 mb-8">
-                      {(ALL_STATUSES.filter(s => ["DCH", "DMH", "DS", "DV", "DET"].includes(s)) as StatusCode[]).map(status => {
-                        const active = getMyStatus(selDay) === status;
-                        const ui = STATUS_UI[status];
-                        const Icon = STATUS_ICONS[status];
-                        const baseClass = active ? "text-white shadow-md" : ui.bg + " " + ui.text + " hover:opacity-90";
-                        return (
-                          <button key={status} disabled={saving} onClick={() => saveStatus(selDay, status)}
-                            className={"flex items-center gap-3 px-5 py-4 rounded-2xl font-semibold transition-all active:scale-[1.02] " + baseClass}
-                            style={active ? { background: "#0073BF" } : {}}>
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
-                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
-                              <Icon className="w-5 h-5" />
-                            </div>
-                            <div className="text-left">
-                              <p className="text-sm font-black">{status}</p>
-                              <p className="text-xs leading-tight">{STATUS_LABELS[status]}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    <p className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">Otras</p>
-                    <div className="grid grid-cols-3 gap-4">
-                      {(ALL_STATUSES.filter(s => ["V", "Li", "Cs", "Tb"].includes(s)) as StatusCode[]).map(status => {
-                        const active = getMyStatus(selDay) === status;
-                        const ui = STATUS_UI[status];
-                        const Icon = STATUS_ICONS[status];
-                        const baseClass = active ? "text-white shadow-md" : ui.bg + " " + ui.text + " hover:opacity-90";
-                        return (
-                          <button key={status} disabled={saving} onClick={() => saveStatus(selDay, status)}
-                            className={"flex items-center gap-3 px-5 py-4 rounded-2xl font-semibold transition-all active:scale-[1.02] " + baseClass}
-                            style={active ? { background: "#0073BF" } : {}}>
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center"
-                              style={active ? { background: "rgba(255,255,255,0.2)" } : {}}>
-                              <Icon className="w-5 h-5" />
-                            </div>
-                            <div className="text-left">
-                              <p className="text-sm font-black">{status}</p>
-                              <p className="text-xs leading-tight">{STATUS_LABELS[status]}</p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {getMyStatus(selDay) && !saving && !savedStatus && (
-                      <button onClick={() => saveStatus(selDay, null)}
-                        className="w-full mt-8 py-4 text-base text-red-400 hover:bg-red-50 rounded-2xl transition-colors font-semibold border border-red-100">
-                        Quitar mi estado
-                      </button>
-                    )}
-
-                    {saving && (
-                      <div className="flex items-center justify-center gap-3 mt-8 text-base text-gray-400">
-                        <div className="w-5 h-5 border-2 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
-                        Guardando...
-                      </div>
-                    )}
-                  </div>
-                ) : !canEdit(selDay) ? (
-                  <div className="py-12 text-center text-gray-400 text-base">
-                    No puedes editar fechas pasadas
-                  </div>
-                ) : null}
+                      );
+                    })
+                  )}
+                </div>
               </div>
-            </div>
+            ) : (
+              <p className="text-sm text-gray-400">Selecciona un día para ver el equipo</p>
+            )}
           </div>
-        )}
+        </div>
       </div>
     );
   }
