@@ -86,10 +86,16 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [isDesktop, setIsDesktop] = useState(false);
 
   useEffect(() => {
-    const checkDesktop = () => setIsDesktop(window.innerWidth >= 1024);
+    const checkDesktop = () => {
+      setIsDesktop(window.innerWidth >= 1024);
+    };
     checkDesktop();
     window.addEventListener("resize", checkDesktop);
-    return () => window.removeEventListener("resize", checkDesktop);
+    window.addEventListener("load", checkDesktop);
+    return () => {
+      window.removeEventListener("resize", checkDesktop);
+      window.removeEventListener("load", checkDesktop);
+    };
   }, []);
 
   const year = currentDate.getFullYear();
@@ -182,279 +188,37 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
               <p className="text-sm text-white/40 mt-2">
                 {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
               </p>
-            </div>
-          </div>
+</div>
+      </div>
 
-          <div className="bg-white rounded-2xl shadow-sm flex-1 overflow-hidden flex flex-col">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
-              <button onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
-                <ChevronLeft className="w-6 h-6" />
-              </button>
-              <div className="text-center">
-                <p className="text-sm text-gray-400">Presencialidad - Codelco</p>
-                <p className="text-2xl font-bold text-gray-900 capitalize">{format(currentDate, "MMMM yyyy", { locale: es })}</p>
-              </div>
-              <button onClick={() => setCurrentDate(new Date(year, month, 1))}
-                className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
-                <ChevronRight className="w-6 h-6" />
-              </button>
-            </div>
-
-            <div className="flex mx-6 mt-4 bg-gray-100 rounded-xl p-1 gap-1 w-fit">
-              {["Mes", "Semana"].map((v, i) => (
-                <button key={v} onClick={() => setWeekView(i === 1)}
-                  className={`px-6 py-2 rounded-lg text-base font-semibold transition-all ${
-                    weekView === (i === 1) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                  }`}>{v}</button>
-              ))}
-            </div>
-
-            <div className="grid grid-cols-7 border-t border-gray-100 mt-4">
-              {DOW.map(d => <div key={d} className="py-4 text-center text-sm font-bold text-gray-400">{d}</div>)}
-            </div>
-
-            <div className="flex-1 overflow-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-64">
-                  <div className="w-8 h-8 border-4 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
-                </div>
-              ) : weekView ? (
-                <div className="grid grid-cols-7 border-t border-gray-100">
-                  {weekDays.map((day, i) => {
-                    const ds = getDaySchedules(day);
-                    const my = getMyStatus(day);
-                    const isSelected = selDay && isSameDay(day, selDay);
-                    const past = isPast(day) && !isSameDay(day, new Date());
-                    const people = peopleOnDate(day);
-                    return (
-                      <button key={i} onClick={() => setSelectedDay(isSelected ? null : day)}
-                        className={`flex flex-col items-center py-6 gap-3 transition-colors min-h-[200px] ${past ? "opacity-40" : "hover:bg-gray-50"}`}>
-                        <span className="w-12 h-12 flex items-center justify-center rounded-full text-lg font-bold"
-                          style={isSelected ? { background: "#0073BF", color: "white" }
-                            : isToday(day) ? { background: "#1a1a2e", color: "white" } : { color: "#374151" }}>
-                          {format(day, "d")}
-                        </span>
-                        <div className="flex gap-1 h-2">
-                          {my && <div className={`w-2 h-2 rounded-full ${dotColor(my)}`} />}
-                          {ds.filter(s => s.status === "Of" && s.personId !== currentPerson?.id).length > 0 && (
-                            <div className="w-2 h-2 rounded-full bg-[#0073BF]" />
-                          )}
-                        </div>
-                        {people.length > 0 && (
-                          <div className="text-xs text-gray-500 text-center px-2">
-                            <span className="font-semibold text-[#0073BF]">{people.length}</span> en oficina
-                          </div>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : (
-                <div className="border-t border-gray-100">
-                  {weeks.map((week, wi) => (
-                    <div key={wi} className="grid grid-cols-7">
-                      {week.map((day, di) => {
-                        if (!day) return <div key={di} className="min-h-[100px]" />;
-                        const ds = getDaySchedules(day);
-                        const my = getMyStatus(day);
-                        const past = isPast(day) && !isSameDay(day, new Date());
-                        const isSelected = selDay && isSameDay(day, selDay);
-                        const weekend = di >= 5;
-                        const dotStatuses = Array.from(new Set(ds.map(s => s.status))).slice(0, 3) as StatusCode[];
-                        const people = peopleOnDate(day);
-
-                        return (
-                          <button key={di} onClick={() => setSelectedDay(isSelected ? null : day)}
-                            className={`flex flex-col items-center py-4 gap-2 min-h-[100px] transition-colors w-full ${
-                              weekend ? "bg-gray-50/50" : "hover:bg-gray-50"
-                            } ${past ? "opacity-40" : ""}`}>
-                            <span className="w-10 h-10 flex items-center justify-center rounded-full text-base font-bold"
-                              style={isSelected ? { background: "#0073BF", color: "white" }
-                                : isToday(day) ? { background: "#1a1a2e", color: "white" }
-                                : { color: "#374151" }}>
-                              {format(day, "d")}
-                            </span>
-                            <div className="flex gap-0.5 h-2">
-                              {dotStatuses.map((s, idx) => (
-                                <div key={idx} className={`w-2 h-2 rounded-full ${dotColor(s)}`} />
-                              ))}
-                            </div>
-                            {people.length > 0 && (
-                              <div className="text-xs font-semibold text-[#0073BF]">{people.length}</div>
-                            )}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="w-80 bg-white rounded-2xl shadow-sm p-5 flex flex-col overflow-hidden">
-          <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
-            <Users className="w-5 h-5 text-[#0073BF]" />
-            Equipo
+      {/* Mobile: Team list below calendar */}
+      {selDay && selSchedules.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <h3 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#0073BF]" />
+            Equipo - {format(selDay, "d MMM", { locale: es })}
           </h3>
-          
-          <div className="flex-1 overflow-auto">
-            {selDay ? (
-              <div>
-                <p className="text-sm font-semibold text-gray-500 mb-3 capitalize">
-                  {format(selDay, "d 'de' MMMM", { locale: es })}
-                </p>
-                <div className="space-y-2">
-                  {selSchedules.length === 0 ? (
-                    <p className="text-sm text-gray-400">No hay registros</p>
-                  ) : (
-                    selSchedules.map((s, idx) => {
-                      const Icon = STATUS_ICONS[s.status];
-                      return (
-                        <div key={idx} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
-                          <div className="w-8 h-8 rounded-full bg-[#0073BF]/10 flex items-center justify-center">
-                            <Icon className="w-4 h-4 text-[#0073BF]" />
-                          </div>
-                          <div className="flex-1">
-                            <p className="text-sm font-semibold text-gray-900">{s.person.name}</p>
-                            <p className="text-xs text-gray-500">{STATUS_LABELS[s.status]}</p>
-                          </div>
-                          <span className="text-xs font-bold px-2 py-1 rounded-lg" style={getStatusBadgeStyle(s.status)}>
-                            {s.status}
-                          </span>
-                        </div>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400">Selecciona un día para ver el equipo</p>
-            )}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-2xl p-4 text-white" style={{ background: "#0073BF" }}>
-          <p className="text-xs font-semibold text-white/70 mb-1">
-            {statsIsToday ? "En oficina hoy" : `En oficina - ${format(statsDay, "d MMM", { locale: es })}`}
-          </p>
-          <p className="text-3xl font-black">{loading ? "-" : statsOf}</p>
-          <p className="text-xs text-white/60 mt-1">de {maxSeats} puestos</p>
-        </div>
-        <div className="rounded-2xl p-4 text-white" style={{ background: "#1a1a2e" }}>
-          <p className="text-xs font-semibold text-white/50 mb-1">Puestos libres</p>
-          <p className={`text-3xl font-black ${statsFree <= 0 ? "text-red-400" : statsFree <= 3 ? "text-amber-400" : "text-white"}`}>
-            {loading ? "-" : statsFree}
-          </p>
-          <p className="text-xs text-white/40 mt-1">
-            {statsIsToday ? "disponibles hoy" : format(statsDay, "d 'de' MMMM", { locale: es })}
-          </p>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-3">
-          <button onClick={() => setCurrentDate(new Date(year, month - 2, 1))}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <div className="text-center">
-            <p className="text-xs text-gray-400 leading-none mb-0.5">Presencialidad - Codelco</p>
-            <p className="font-bold text-gray-900 capitalize">{format(currentDate, "MMMM yyyy", { locale: es })}</p>
-          </div>
-          <button onClick={() => setCurrentDate(new Date(year, month, 1))}
-            className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-500">
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="flex mx-4 mb-3 bg-gray-100 rounded-xl p-1 gap-1">
-          {["Mes", "Semana"].map((v, i) => (
-            <button key={v} onClick={() => setWeekView(i === 1)}
-              className={`flex-1 py-1.5 rounded-lg text-sm font-semibold transition-all ${
-                weekView === (i === 1) ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-              }`}>{v}</button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-7 border-t border-gray-100">
-          {DOW.map(d => <div key={d} className="py-2 text-center text-xs font-bold text-gray-400">{d}</div>)}
-        </div>
-
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-5 h-5 border-2 border-[#0073BF] border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : weekView ? (
-          <div className="border-t border-gray-100 grid grid-cols-7">
-            {weekDays.map((day, i) => {
-              const ds = getDaySchedules(day);
-              const my = getMyStatus(day);
-              const isSelected = selDay && isSameDay(day, selDay);
-              const past = isPast(day) && !isSameDay(day, new Date());
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {selSchedules.map((s, idx) => {
+              const Icon = STATUS_ICONS[s.status];
               return (
-                <button key={i} onClick={() => setSelectedDay(isSelected ? null : day)}
-                  className={`flex flex-col items-center py-3 gap-1.5 transition-colors ${past ? "opacity-40" : "hover:bg-gray-50"}`}>
-                  <span className="w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold"
-                    style={isSelected ? { background: "#0073BF", color: "white" }
-                      : isToday(day) ? { background: "#1a1a2e", color: "white" } : { color: "#374151" }}>
-                    {format(day, "d")}
-                  </span>
-                  <div className="flex gap-0.5 h-1.5 items-center">
-                    {my && <div className={`w-1.5 h-1.5 rounded-full ${dotColor(my)}`} />}
-                    {ds.filter(s => s.status === "Of" && s.personId !== currentPerson?.id).length > 0 && (
-                      <div className="w-1 h-1 rounded-full bg-[#0073BF]" />
-                    )}
+                <div key={idx} className="flex items-center gap-3 p-2 rounded-xl bg-gray-50">
+                  <div className="w-8 h-8 rounded-full bg-[#0073BF]/10 flex items-center justify-center flex-shrink-0">
+                    <Icon className="w-4 h-4 text-[#0073BF]" />
                   </div>
-                </button>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-gray-900 truncate">{s.person.name}</p>
+                    <p className="text-xs text-gray-500">{STATUS_LABELS[s.status]}</p>
+                  </div>
+                  <span className="text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0" style={getStatusBadgeStyle(s.status)}>
+                    {s.status}
+                  </span>
+                </div>
               );
             })}
           </div>
-        ) : (
-          <div className="border-t border-gray-100">
-            {weeks.map((week, wi) => (
-              <div key={wi} className="grid grid-cols-7">
-                {week.map((day, di) => {
-                  if (!day) return <div key={di} className="min-h-[56px]" />;
-                  const ds = getDaySchedules(day);
-                  const my = getMyStatus(day);
-                  const past = isPast(day) && !isSameDay(day, new Date());
-                  const isSelected = selDay && isSameDay(day, selDay);
-                  const weekend = di >= 5;
-                  const dotStatuses = Array.from(new Set(ds.map(s => s.status))).slice(0, 3) as StatusCode[];
-
-                  return (
-                    <button key={di} onClick={() => setSelectedDay(isSelected ? null : day)}
-                      className={`flex flex-col items-center py-2 gap-1 min-h-[56px] transition-colors w-full ${
-                        weekend ? "bg-gray-50/50" : "hover:bg-gray-50"
-                      } ${past ? "opacity-40" : ""}`}>
-                      <span className="w-8 h-8 flex items-center justify-center rounded-full text-sm font-bold"
-                        style={isSelected ? { background: "#0073BF", color: "white" }
-                          : isToday(day) ? { background: "#1a1a2e", color: "white" }
-                          : { color: "#374151" }}>
-                        {format(day, "d")}
-                      </span>
-                      <div className="flex gap-0.5 h-1.5 items-center">
-                        {dotStatuses.map((s, idx) => (
-                          <div key={idx} className={`w-1.5 h-1.5 rounded-full ${dotColor(s)}`} />
-                        ))}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {selDay && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
