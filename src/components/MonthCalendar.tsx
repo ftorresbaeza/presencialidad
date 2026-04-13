@@ -83,8 +83,10 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const [savedStatus, setSavedStatus] = useState<StatusCode | null>(null);
   const [weekView, setWeekView] = useState(false);
   const [isDesktop, setIsDesktop] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const checkDesktop = () => {
       const width = window.innerWidth;
       setIsDesktop(width >= 768);
@@ -158,6 +160,18 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
   const statsOf = statsSchedules.filter(s => s.status === "Of").length;
   const statsFree = maxSeats - statsOf;
   const statsIsToday = isToday(statsDay);
+
+  if (!mounted) {
+    return (
+      <div className="flex flex-col gap-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-2xl p-4 bg-gray-200 animate-pulse h-24"></div>
+          <div className="rounded-2xl p-4 bg-gray-200 animate-pulse h-24"></div>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm p-4 h-64"></div>
+      </div>
+    );
+  }
 
   if (isDesktop) {
     return (
