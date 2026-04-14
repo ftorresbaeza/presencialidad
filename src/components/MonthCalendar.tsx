@@ -410,7 +410,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
                 </div>
               </div>
 
-<div className="overflow-y-auto flex-1 pb-8">
+<div className="overflow-y-auto pb-20">
                 {canEdit(selDay) && currentPerson ? (
                   <div className="px-5 py-4">
                     {savedStatus && (
@@ -723,7 +723,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
               </div>
             </div>
 
-            <div className="overflow-y-auto flex-1">
+            <div className="overflow-y-auto pb-20">
               {canEdit(selDay) && currentPerson ? (
                 <div className="px-5 py-4">
                   {savedStatus && (
