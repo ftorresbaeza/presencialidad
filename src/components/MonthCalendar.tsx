@@ -166,8 +166,8 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
 
   if (isDesktop) {
     return (
-      <div className="flex flex-col gap-6 h-full">
-        <div className="flex flex-col gap-4">
+      <div className="flex gap-6 h-full">
+        <div className="flex-1 flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="rounded-2xl p-6 text-white" style={{ background: "#0073BF" }}>
               <p className="text-sm font-semibold text-white/70 mb-2">
@@ -296,7 +296,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
           </div>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm p-5 flex flex-col overflow-hidden">
+        <div className="w-80 bg-white rounded-2xl shadow-sm p-5 flex flex-col overflow-hidden shrink-0">
           <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-[#0073BF]" />
             Equipo
@@ -410,7 +410,7 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
                 </div>
               </div>
 
-              <div className="overflow-y-auto flex-1">
+<div className="overflow-y-auto flex-1 pb-8">
                 {canEdit(selDay) && currentPerson ? (
                   <div className="px-5 py-4">
                     {savedStatus && (
@@ -667,6 +667,27 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
       </div>
 
       {selDay && (
+        <div className="bg-white rounded-2xl shadow-sm p-4">
+          <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+            <Users className="w-4 h-4 text-[#0073BF]" />
+            Equipo - {format(selDay, "d MMM", { locale: es })}
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {selSchedules.length === 0 ? (
+              <p className="text-sm text-gray-400">No hay registros</p>
+            ) : (
+              selSchedules.map((s, idx) => (
+                <div key={idx} className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-gray-50 text-xs">
+                  <span className="font-semibold text-gray-800">{s.person.name}</span>
+                  <span className="font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600">{s.status}</span>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {selDay && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
           onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}>
           <div className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl max-h-[88vh] flex flex-col"
@@ -816,6 +837,23 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
                       );
                     })}
                   </div>
+
+                  {selSchedules.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-gray-100">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2">Equipo ({selSchedules.length})</p>
+                      <div className="space-y-2 max-h-40 overflow-y-auto">
+                        {selSchedules.filter(s => s.personId !== currentPerson?.id).map((s, idx) => (
+                          <div key={idx} className="flex items-center gap-2 p-2 rounded-lg bg-gray-50">
+                            <div className="w-6 h-6 rounded-full bg-[#0073BF]/10 flex items-center justify-center text-[#0073BF] text-xs font-bold">
+                              {s.person.name[0]}
+                            </div>
+                            <p className="text-xs font-semibold text-gray-800 truncate">{s.person.name}</p>
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 ml-auto">{s.status}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {getMyStatus(selDay) && !saving && !savedStatus && (
                     <button onClick={() => saveStatus(selDay, null)}
