@@ -104,7 +104,7 @@ export default function AdminClient() {
   return (
     <div className="min-h-screen" style={{ background: "#F4F5F7" }}>
       <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
+        <div className="max-w-2xl md:max-w-7xl mx-auto px-4 py-3 flex items-center gap-3">
           <a href="/" className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-600">
             <ChevronLeft className="w-5 h-5" />
           </a>
@@ -123,7 +123,7 @@ export default function AdminClient() {
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-4 pb-20">
+      <main className="max-w-2xl md:max-w-7xl mx-auto px-4 py-4 pb-20">
         {!activeTab ? (
           <div className="grid grid-cols-3 gap-3 mb-4">
             {TABS.map(tab => {

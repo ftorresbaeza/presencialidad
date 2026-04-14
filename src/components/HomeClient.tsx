@@ -25,7 +25,7 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
     <div className="min-h-screen" style={{ background: "#F4F5F7" }}>
       {/* Header */}
       <header className="bg-white shadow-sm sticky top-0 z-40">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-lg md:max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div>
             <p className="text-xs text-gray-400 leading-none">Codelco</p>
             <h1 className="font-black text-gray-900 text-base leading-tight">Presencialidad</h1>
@@ -57,7 +57,7 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
         </div>
 
         {currentPerson && (
-          <div className="max-w-lg mx-auto px-4 pb-3 flex items-center gap-2">
+          <div className="max-w-lg md:max-w-7xl mx-auto px-4 pb-3 flex items-center gap-2">
             <p className="text-sm font-semibold text-gray-700">{currentPerson.name}</p>
             <span className="text-xs text-gray-400">·</span>
             <p className="text-xs text-gray-400">{currentPerson.type === "INTERNAL" ? "Personal Interno" : "Personal Externo"}</p>
@@ -66,7 +66,7 @@ export default function HomeClient({ currentPerson, maxSeats, userName, userImag
         )}
       </header>
 
-      <main className="mx-auto px-4 py-4 pb-24">
+      <main className="max-w-lg md:max-w-7xl mx-auto px-4 py-4 pb-24">
         <MonthCalendar
           currentPerson={currentPerson}
           maxSeats={maxSeats}
