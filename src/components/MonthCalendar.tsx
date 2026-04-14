@@ -375,9 +375,9 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
         </div>
 
         {selDay && (
-          <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm overflow-y-auto"
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
             onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}>
-            <div className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl min-h-[50vh] max-h-[88vh] my-auto"
+            <div className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl min-h-[70vh] max-h-[90vh]"
               onClick={e => e.stopPropagation()}>
               <div className="flex justify-center pt-3 pb-1">
                 <div className="w-10 h-1 bg-gray-200 rounded-full" />
@@ -688,9 +688,9 @@ export default function MonthCalendar({ currentPerson, maxSeats }: Props) {
       )}
 
       {selDay && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm overflow-y-auto"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={() => { setSelectedDay(null); setSaveError(null); setSavedStatus(null); }}>
-          <div className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl min-h-[50vh] max-h-[88vh] my-auto"
+          <div className="bg-white rounded-t-3xl w-full max-w-lg shadow-2xl min-h-[70vh] max-h-[90vh]"
             onClick={e => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1">
               <div className="w-10 h-1 bg-gray-200 rounded-full" />
